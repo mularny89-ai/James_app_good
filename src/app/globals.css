@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Mellan Consulting Engineers — central design tokens (overridden by settings at runtime) */
+:root {
+  --brand-primary: #34368b;
+  --brand-dark: #23255f;
+  --brand-light: #8f90c9;
+  --brand-bg: #f0f0f8;
+  --text-primary: #1e2430;
+  --text-secondary: #5b6572;
+  --border-grey: #d9dee5;
+  --page-bg: #f4f6f9;
+  --success: #15803d;
+  --warning: #b45309;
+  --error: #b91c1c;
+  --info: #0e7cc4;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  @apply bg-page text-ink antialiased;
+  font-size: 14px;
+}
+
+/* Compact professional controls */
+input, select, textarea {
+  @apply text-sm;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium text-ink hover:bg-gray-50 transition-colors;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-white transition-colors;
+    background-color: var(--brand-primary);
+  }
+  .btn-primary:hover {
+    background-color: var(--brand-dark);
+  }
+  .btn-danger {
+    @apply inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50;
+  }
+  .input {
+    @apply w-full rounded-md border border-line bg-white px-2.5 py-1.5 text-sm outline-none;
+  }
+  .input:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 18%, transparent);
+  }
+  .card {
+    @apply rounded-lg border border-line bg-white;
+  }
+  .th {
+    @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-ink-muted;
+  }
+  .td {
+    @apply px-3 py-2 text-sm;
+  }
+  .label {
+    @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-muted;
+  }
+  .section-title {
+    @apply text-sm font-semibold uppercase tracking-wide text-ink-muted;
+  }
+  .link {
+    color: var(--brand-primary);
+  }
+  .link:hover {
+    text-decoration: underline;
+  }
+}
+
+/* Kanban */
+.kanban-col {
+  @apply flex w-72 shrink-0 flex-col rounded-lg border border-line bg-gray-50;
+}
+.kanban-col.drag-over {
+  outline: 2px dashed var(--brand-primary);
+  outline-offset: -2px;
+}
+
+/* Calendar */
+.cal-cell {
+  @apply min-h-[96px] border-b border-r border-line bg-white p-1 align-top;
+}
+.cal-cell.other-month {
+  @apply bg-gray-50;
+}
+.cal-cell.today {
+  background-color: var(--brand-bg);
+}
+.cal-event {
+  @apply mb-0.5 block w-full cursor-pointer truncate rounded px-1 py-0.5 text-left text-xs text-white;
+}
+
+/* Print stylesheet for brand documents (quotes, invoices, reports) */
+@media print {
+  body * { visibility: hidden; }
+  .print-doc, .print-doc * { visibility: visible; }
+  .print-doc { position: absolute; inset: 0; padding: 0 !important; }
+  .no-print { display: none !important; }
+}

@@ -1,0 +1,315 @@
+// Mellan Practice Manager — relational schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Configuration / Settings ----------
+
+model CompanySettings {
+  id               Int     @id @default(1)
+  companyName      String  @default("Mellan Consulting Engineers")
+  tradingName      String  @default("")
+  abn              String  @default("")
+  address          String  @default("")
+  phone            String  @default("")
+  email            String  @default("")
+  website          String  @default("mellanconsulting.com.au")
+  logoPath         String  @default("/uploads/branding/default-logo.webp")
+  primaryColor     String  @default("#34368B")
+  secondaryColor   String  @default("#23255F")
+  gstRate          Float   @default(10)
+  currency         String  @default("AUD")
+  // Numbering
+  jobNumberFormat  String  @default("YY###") // YY = year, ### = sequence
+  quotePrefix      String  @default("Q-")
+  quoteFormat      String  @default("YY###")
+  invoicePrefix    String  @default("INV-")
+  invoiceFormat    String  @default("YY####")
+  // Preferences
+  dateFormat       String  @default("d MMM yyyy") // Australian
+  timeFormat       String  @default("24h")
+  updatedAt        DateTime @updatedAt
+}
+
+model NumberSequence {
+  id        Int @id @default(autoincrement())
+  key       String // "job" | "quote" | "invoice"
+  year      Int
+  nextValue Int @default(1)
+  @@unique([key, year])
+}
+
+model JobStatus {
+  id            Int    @id @default(autoincrement())
+  name          String @unique
+  order         Int    @default(0)
+  color         String @default("#64748b")
+  isBoardColumn Boolean @default(false) // shown as a Kanban column
+  boardOrder    Int    @default(0)
+  jobs          Job[]
+}
+
+model JobType {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  order Int    @default(0)
+  jobs  Job[]
+}
+
+model TaskList {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  order    Int     @default(0)
+  isSystem Boolean @default(false)
+  tasks    Task[]
+}
+
+model InspectionType {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  order       Int              @default(0)
+  inspections SiteInspection[]
+}
+
+// ---------- Clients ----------
+
+model Client {
+  id             Int              @id @default(autoincrement())
+  name           String
+  company        String           @default("")
+  contactPerson  String           @default("")
+  phone          String           @default("")
+  mobile         String           @default("")
+  email          String           @default("")
+  billingAddress String           @default("")
+  abn            String           @default("")
+  notes          String           @default("")
+  archived       Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  jobs           Job[]
+  quotes         Quote[]
+  invoices       Invoice[]
+  tasks          Task[]
+  activities     Activity[]
+}
+
+// ---------- Quotes ----------
+
+model Quote {
+  id           Int         @id @default(autoincrement())
+  quoteNumber  String      @unique
+  date         DateTime    @default(now())
+  clientId     Int
+  client       Client      @relation(fields: [clientId], references: [id])
+  contactName  String      @default("")
+  siteAddress  String      @default("")
+  project      String      @default("")
+  projectType  String      @default("")
+  scope        String      @default("")
+  exclusions   String      @default("")
+  subtotal     Float       @default(0)
+  gst          Float       @default(0)
+  total        Float       @default(0)
+  validUntil   DateTime?
+  notes        String      @default("")
+  status       String      @default("Draft") // Draft | Sent | Accepted | Declined | Expired | Cancelled
+  archived     Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  items        QuoteItem[]
+  job          Job?
+  activities   Activity[]
+}
+
+model QuoteItem {
+  id          Int   @id @default(autoincrement())
+  quoteId     Int
+  quote       Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  description String
+  qty         Float @default(1)
+  unitPrice   Float @default(0)
+  amount      Float @default(0)
+  order       Int   @default(0)
+}
+
+// ---------- Jobs ----------
+
+model Job {
+  id             Int              @id @default(autoincrement())
+  jobNumber      Int              @unique
+  name           String
+  clientId       Int
+  client         Client           @relation(fields: [clientId], references: [id])
+  clientContact  String           @default("")
+  siteAddress    String           @default("")
+  billingAddress String           @default("")
+  description    String           @default("")
+  scope          String           @default("")
+  projectTypeId  Int?
+  projectType    JobType?         @relation(fields: [projectTypeId], references: [id])
+  statusId       Int
+  status         JobStatus        @relation(fields: [statusId], references: [id])
+  priority       String           @default("Normal") // Low | Normal | High | Urgent
+  assignedEngineer String         @default("")
+  startDate      DateTime?
+  dueDate        DateTime?
+  completedAt    DateTime?
+  quotedFee      Float            @default(0)
+  variations     Float            @default(0)
+  notes          String           @default("")
+  quoteId        Int?             @unique
+  quote          Quote?           @relation(fields: [quoteId], references: [id])
+  archived       Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  tasks          Task[]
+  inspections    SiteInspection[]
+  invoices       Invoice[]
+  jobNotes       JobNote[]
+  documents      Document[]
+  activities     Activity[]
+}
+
+// ---------- Tasks ----------
+
+model Task {
+  id          Int       @id @default(autoincrement())
+  title       String
+  description String    @default("")
+  jobId       Int?
+  job         Job?      @relation(fields: [jobId], references: [id])
+  clientId    Int?
+  client      Client?   @relation(fields: [clientId], references: [id])
+  listId      Int
+  list        TaskList  @relation(fields: [listId], references: [id])
+  completed   Boolean   @default(false)
+  priority    String    @default("Normal")
+  important   Boolean   @default(false)
+  inMyDay     Boolean   @default(false)
+  myDayDate   DateTime?
+  dueDate     DateTime?
+  dueTime     String    @default("")
+  reminder    DateTime?
+  recurrence  String    @default("") // "", daily, weekly, monthly, yearly
+  notes       String    @default("")
+  sortOrder   Int       @default(0)
+  parentId    Int?
+  parent      Task?     @relation("Subtasks", fields: [parentId], references: [id])
+  subtasks    Task[]    @relation("Subtasks")
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  activities  Activity[]
+}
+
+// ---------- Site Inspections ----------
+
+model SiteInspection {
+  id            Int             @id @default(autoincrement())
+  jobId         Int?
+  job           Job?            @relation(fields: [jobId], references: [id])
+  jobName       String          @default("")
+  clientName    String          @default("")
+  siteAddress   String          @default("")
+  typeId        Int?
+  type          InspectionType? @relation(fields: [typeId], references: [id])
+  date          DateTime
+  startTime     String          @default("09:00")
+  endTime       String          @default("10:00")
+  contactPerson String          @default("")
+  contactPhone  String          @default("")
+  contactEmail  String          @default("")
+  notes         String          @default("")
+  status        String          @default("Scheduled") // Scheduled | Confirmed | Completed | Cancelled | Rescheduled
+  createdAt     DateTime        @default(now())
+}
+
+// ---------- Invoices ----------
+
+model Invoice {
+  id              Int           @id @default(autoincrement())
+  invoiceNumber   String        @unique
+  date            DateTime      @default(now())
+  dueDate         DateTime?
+  clientId        Int
+  client          Client        @relation(fields: [clientId], references: [id])
+  billingAddress  String        @default("")
+  jobId           Int?
+  job             Job?          @relation(fields: [jobId], references: [id])
+  siteAddress     String        @default("")
+  description     String        @default("")
+  subtotal        Float         @default(0)
+  gst             Float         @default(0)
+  total           Float         @default(0)
+  amountPaid      Float         @default(0)
+  notes           String        @default("")
+  status          String        @default("Draft") // Draft | Sent | Part Paid | Paid | Overdue | Cancelled
+  archived        Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  items           InvoiceItem[]
+  payments        Payment[]
+  activities      Activity[]
+}
+
+model InvoiceItem {
+  id          Int     @id @default(autoincrement())
+  invoiceId   Int
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  qty         Float   @default(1)
+  unitPrice   Float   @default(0)
+  amount      Float   @default(0)
+  order       Int     @default(0)
+}
+
+model Payment {
+  id        Int      @id @default(autoincrement())
+  invoiceId Int
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  date      DateTime @default(now())
+  amount    Float
+  method    String   @default("")
+  note      String   @default("")
+}
+
+// ---------- Job support ----------
+
+model JobNote {
+  id        Int      @id @default(autoincrement())
+  jobId     Int
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  content   String
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Document {
+  id         Int      @id @default(autoincrement())
+  jobId      Int
+  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  category   String   @default("Other")
+  name       String
+  revision   String   @default("A")
+  filePath   String   @default("")
+  uploadedAt DateTime @default(now())
+}
+
+model Activity {
+  id        Int      @id      @default(autoincrement())
+  message   String
+  jobId     Int?
+  job       Job?     @relation(fields: [jobId], references: [id])
+  clientId  Int?
+  client    Client?  @relation(fields: [clientId], references: [id])
+  quoteId   Int?
+  quote     Quote?   @relation(fields: [quoteId], references: [id])
+  invoiceId Int?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+  taskId    Int?
+  task      Task?    @relation(fields: [taskId], references: [id])
+  createdAt DateTime @default(now())
+}

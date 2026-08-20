@@ -1,0 +1,174 @@
+import { db } from "@/lib/db";
+import { getSettings } from "@/lib/settings";
+import { saveCompanySettings, saveNumberingSettings, saveFinancialSettings, savePreferences } from "@/lib/actions/settings";
+import { peekNextJobNumber, peekNextQuoteNumber } from "@/lib/numbering";
+import { PageHeader, Field } from "@/components/ui";
+import BrandingForm from "@/components/BrandingForm";
+import ConfigListEditor from "@/components/ConfigListEditor";
+import Link from "next/link";
+
+export const dynamic = "force-dynamic";
+
+const TABS = [
+  { key: "company", label: "Company" },
+  { key: "branding", label: "Branding" },
+  { key: "numbering", label: "Numbering" },
+  { key: "statuses", label: "Job Statuses" },
+  { key: "types", label: "Job Types" },
+  { key: "lists", label: "Task Lists" },
+  { key: "inspections", label: "Inspection Types" },
+  { key: "financial", label: "Financial" },
+  { key: "preferences", label: "Preferences" },
+];
+
+export default async function SettingsPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
+  const tab = searchParams.tab ?? "company";
+  const [settings, statuses, types, lists, inspTypes, nextJob, nextQuote] = await Promise.all([
+    getSettings(),
+    db.jobStatus.findMany({ orderBy: { order: "asc" } }),
+    db.jobType.findMany({ orderBy: { order: "asc" } }),
+    db.taskList.findMany({ orderBy: { order: "asc" } }),
+    db.inspectionType.findMany({ orderBy: { order: "asc" } }),
+    peekNextJobNumber(),
+    peekNextQuoteNumber(),
+  ]);
+
+  return (
+    <div className="p-5">
+      <PageHeader title="Settings" />
+
+      <nav className="mb-4 flex flex-wrap gap-1 border-b border-line">
+        {TABS.map((t) => (
+          <Link
+            key={t.key}
+            href={`/settings?tab=${t.key}`}
+            className={`px-3 py-2 text-sm font-medium ${tab === t.key ? "border-b-2" : "text-ink-muted hover:text-ink"}`}
+            style={tab === t.key ? { borderColor: "var(--brand-primary)", color: "var(--brand-primary)" } : undefined}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </nav>
+
+      <div className="max-w-4xl">
+        {tab === "company" && (
+          <form action={saveCompanySettings} className="card space-y-4 p-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Company Name"><input name="companyName" className="input" defaultValue={settings.companyName} /></Field>
+              <Field label="Trading Name"><input name="tradingName" className="input" defaultValue={settings.tradingName} /></Field>
+              <Field label="ABN"><input name="abn" className="input" defaultValue={settings.abn} /></Field>
+              <Field label="Phone"><input name="phone" className="input" defaultValue={settings.phone} /></Field>
+              <Field label="Email"><input type="email" name="email" className="input" defaultValue={settings.email} /></Field>
+              <Field label="Website"><input name="website" className="input" defaultValue={settings.website} /></Field>
+              <Field label="Address" className="sm:col-span-2"><input name="address" className="input" defaultValue={settings.address} /></Field>
+            </div>
+            <div className="flex justify-end border-t border-line pt-4">
+              <button type="submit" className="btn-primary">Save Company Details</button>
+            </div>
+          </form>
+        )}
+
+        {tab === "branding" && (
+          <BrandingForm primaryColor={settings.primaryColor} secondaryColor={settings.secondaryColor} logoPath={settings.logoPath} />
+        )}
+
+        {tab === "numbering" && (
+          <form action={saveNumberingSettings} className="card space-y-4 p-5">
+            <p className="text-sm text-ink-muted">
+              Formats use <code>YY</code> for the two-digit year and <code>#</code> for the sequence digits.
+              Job and quote sequences are independent — quotes never consume job numbers.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={`Job Number Format (next: ${nextJob})`}>
+                <input name="jobNumberFormat" className="input" defaultValue={settings.jobNumberFormat} />
+              </Field>
+              <div />
+              <Field label={`Quote Prefix (next: ${nextQuote})`}>
+                <input name="quotePrefix" className="input" defaultValue={settings.quotePrefix} />
+              </Field>
+              <Field label="Quote Format">
+                <input name="quoteFormat" className="input" defaultValue={settings.quoteFormat} />
+              </Field>
+              <Field label="Invoice Prefix">
+                <input name="invoicePrefix" className="input" defaultValue={settings.invoicePrefix} />
+              </Field>
+              <Field label="Invoice Format">
+                <input name="invoiceFormat" className="input" defaultValue={settings.invoiceFormat} />
+              </Field>
+            </div>
+            <div className="flex justify-end border-t border-line pt-4">
+              <button type="submit" className="btn-primary">Save Numbering</button>
+            </div>
+          </form>
+        )}
+
+        {tab === "statuses" && (
+          <div className="card p-5">
+            <h3 className="section-title mb-1">Job Statuses</h3>
+            <ConfigListEditor kind="status" items={statuses} boardControls />
+          </div>
+        )}
+
+        {tab === "types" && (
+          <div className="card p-5">
+            <h3 className="section-title mb-1">Job Types</h3>
+            <ConfigListEditor kind="jobType" items={types} />
+          </div>
+        )}
+
+        {tab === "lists" && (
+          <div className="card p-5">
+            <h3 className="section-title mb-1">Task Lists</h3>
+            <p className="mb-3 text-xs text-ink-muted">System lists (marked, no remove button) are required by the application. Add your own lists freely.</p>
+            <ConfigListEditor kind="taskList" items={lists.map((l) => ({ id: l.id, name: l.name, isSystem: l.isSystem }))} />
+          </div>
+        )}
+
+        {tab === "inspections" && (
+          <div className="card p-5">
+            <h3 className="section-title mb-1">Inspection Types</h3>
+            <ConfigListEditor kind="inspectionType" items={inspTypes} />
+          </div>
+        )}
+
+        {tab === "financial" && (
+          <form action={saveFinancialSettings} className="card space-y-4 p-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="GST Rate (%)"><input type="number" step="0.1" min="0" name="gstRate" className="input" defaultValue={settings.gstRate} /></Field>
+              <Field label="Currency">
+                <select name="currency" className="input" defaultValue={settings.currency}>
+                  {["AUD", "NZD", "USD", "GBP"].map((c) => <option key={c}>{c}</option>)}
+                </select>
+              </Field>
+            </div>
+            <div className="flex justify-end border-t border-line pt-4">
+              <button type="submit" className="btn-primary">Save Financial Settings</button>
+            </div>
+          </form>
+        )}
+
+        {tab === "preferences" && (
+          <form action={savePreferences} className="card space-y-4 p-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Date Format">
+                <select name="dateFormat" className="input" defaultValue={settings.dateFormat}>
+                  <option value="d MMM yyyy">20 Aug 2026</option>
+                  <option value="dd/MM/yyyy">20/08/2026</option>
+                </select>
+              </Field>
+              <Field label="Time Format">
+                <select name="timeFormat" className="input" defaultValue={settings.timeFormat}>
+                  <option value="24h">24-hour (14:30)</option>
+                  <option value="12h">12-hour (2:30 pm)</option>
+                </select>
+              </Field>
+            </div>
+            <div className="flex justify-end border-t border-line pt-4">
+              <button type="submit" className="btn-primary">Save Preferences</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
