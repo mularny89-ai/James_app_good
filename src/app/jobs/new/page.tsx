@@ -88,6 +88,21 @@ export default async function NewJobPage({ searchParams }: { searchParams: Recor
             <Field label="Quoted Fee (ex GST)">
               <input type="number" step="0.01" min="0" name="quotedFee" className="input" placeholder="0.00" />
             </Field>
+            {/* Optional planner scheduling (Section 43) */}
+            <Field label="Planned Start (optional)">
+              <input type="date" name="plannedStart" className="input" />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Planned Duration (optional)">
+                <input type="number" min={1} step={1} name="plannedDuration" className="input" placeholder="e.g. 5" />
+              </Field>
+              <Field label="Duration Unit">
+                <select name="durationUnit" className="input" defaultValue="working">
+                  <option value="working">Working Days</option>
+                  <option value="calendar">Calendar Days</option>
+                </select>
+              </Field>
+            </div>
             <Field label="Project Description" className="sm:col-span-2">
               <textarea name="description" rows={2} className="input" />
             </Field>

@@ -169,6 +169,14 @@ model Job {
   notes          String           @default("")
   quoteId        Int?             @unique
   quote          Quote?           @relation(fields: [quoteId], references: [id])
+  // ----- Job Planner -----
+  plannedStartDate  DateTime?
+  plannedEndDate    DateTime?
+  plannedDuration   Int?
+  durationUnit      String   @default("working") // working | calendar
+  plannerColor      String   @default("")
+  plannerSortOrder  Int      @default(0) // manual vertical order on the planner
+  unscheduledOrder  Int      @default(0) // manual order within Unscheduled Jobs
   archived       Boolean          @default(false)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt

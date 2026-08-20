@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { fmtDate, fmtMoney, isToday, isOverdue, startOfDay, endOfDay, addDays } from "@/lib/format";
+import { fmtDate, fmtMoney, isToday, isOverdue, startOfDay, endOfDay, addDays, startOfWeek } from "@/lib/format";
 import { refreshOverdueInvoices } from "@/lib/actions/invoices";
 import { PageHeader, EmptyState, SoftBadge } from "@/components/ui";
 import { inspectionStatusColor, priorityColor } from "@/lib/constants";
@@ -27,6 +27,10 @@ export default async function DashboardPage() {
   const todayStart = startOfDay(now);
   const todayEnd = endOfDay(now);
   const weekEnd = endOfDay(addDays(now, 7));
+  // Job Planner stats for the current Mon–Sun week (Section 70)
+  const calWeekStart = startOfDay(startOfWeek(now));
+  const calWeekEnd = endOfDay(addDays(calWeekStart, 6));
+  const activeStatusFilter = { name: { notIn: ["Completed", "Cancelled"] } };
 
   const [
     jobsToStart, jobsInProgress, jobsToFinalise, jobsAwaitingInfo,
@@ -35,6 +39,7 @@ export default async function DashboardPage() {
     todaysTasks, todaysInspections, jobsDueToday,
     overdueJobs, upcomingInspections, upcomingDeadlines,
     recentJobs, updatedJobs, quotesPending, unpaidInvoices,
+    plannedThisWeek, startingThisWeek, finishingThisWeek, unscheduledJobs,
   ] = await Promise.all([
     db.job.count({ where: { archived: false, status: { name: "To Start" } } }),
     db.job.count({ where: { archived: false, status: { name: "In Progress" } } }),
@@ -56,6 +61,10 @@ export default async function DashboardPage() {
     db.job.findMany({ where: { archived: false }, include: { client: true, status: true }, orderBy: { updatedAt: "desc" }, take: 6 }),
     db.quote.findMany({ where: { archived: false, status: "Sent" }, include: { client: true }, orderBy: { date: "asc" }, take: 8 }),
     db.invoice.findMany({ where: { archived: false, status: { in: ["Sent", "Part Paid", "Overdue"] } }, include: { client: true, job: true }, orderBy: { dueDate: "asc" }, take: 8 }),
+    db.job.count({ where: { archived: false, status: activeStatusFilter, plannedStartDate: { not: null, lte: calWeekEnd }, plannedEndDate: { not: null, gte: calWeekStart } } }),
+    db.job.count({ where: { archived: false, status: activeStatusFilter, plannedStartDate: { gte: calWeekStart, lte: calWeekEnd } } }),
+    db.job.count({ where: { archived: false, status: activeStatusFilter, plannedEndDate: { gte: calWeekStart, lte: calWeekEnd } } }),
+    db.job.count({ where: { archived: false, status: activeStatusFilter, plannedStartDate: null } }),
   ]);
 
   const outstandingTotal = (outstandingAgg._sum.total ?? 0) - (outstandingAgg._sum.amountPaid ?? 0);
@@ -83,6 +92,11 @@ export default async function DashboardPage() {
           <div className="text-2xl font-bold leading-none" style={{ color: "var(--error)" }}>{fmtMoney(outstandingTotal)}</div>
           <div className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Total Outstanding</div>
         </div>
+        {/* Job Planner (Section 70) */}
+        <Card href="/planner?view=week" label="Jobs Planned This Week" count={plannedThisWeek} tone="#3b5bdb" />
+        <Card href="/planner?view=week" label="Jobs Starting This Week" count={startingThisWeek} tone="#2f9e44" />
+        <Card href="/planner?view=week" label="Jobs Finishing This Week" count={finishingThisWeek} tone="#e8590c" />
+        <Card href="/planner?panel=unscheduled" label="Unscheduled Jobs" count={unscheduledJobs} tone="#64748b" />
       </div>
 
       {/* TODAY — Section 12 */}

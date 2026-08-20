@@ -11,6 +11,7 @@ import JobProgress from "@/components/JobProgress";
 import NotesSection from "@/components/NotesSection";
 import { archiveJob } from "@/lib/actions/jobs";
 import { PRIORITIES, DOCUMENT_CATEGORIES, quoteStatusColor, invoiceStatusColor, inspectionStatusColor, priorityColor } from "@/lib/constants";
+import { planningStatus, PLANNING_STATUS_LABELS } from "@/lib/planner";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -171,6 +172,41 @@ export default async function JobDetailPage({
           </form>
 
           <div className="space-y-4">
+            {/* Planning — Job Planner integration (Section 42) */}
+            <div className="card">
+              <h3 className="section-title border-b border-line px-3 py-2">Planning</h3>
+              {job.plannedStartDate ? (
+                <>
+                  <StatRow
+                    label="Planner Colour"
+                    value={
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: job.plannerColor || "#3b5bdb" }} />
+                        {job.plannerColor || "—"}
+                      </span>
+                    }
+                  />
+                  <StatRow label="Planned Start" value={fmtDate(job.plannedStartDate)} />
+                  <StatRow label="Planned End" value={fmtDate(job.plannedEndDate)} />
+                  <StatRow
+                    label="Duration"
+                    value={job.plannedDuration ? `${job.plannedDuration} ${job.durationUnit === "calendar" ? "calendar" : "working"} day${job.plannedDuration === 1 ? "" : "s"}` : "—"}
+                  />
+                  <StatRow
+                    label="Planning Status"
+                    value={PLANNING_STATUS_LABELS[planningStatus({ plannedStartDate: job.plannedStartDate, plannedEndDate: job.plannedEndDate, statusName: job.status.name })]}
+                  />
+                  <div className="px-3 py-2">
+                    <Link href={`/planner?view=week&start=${toInputDate(job.plannedStartDate)}`} className="btn w-full justify-center">View in Planner</Link>
+                  </div>
+                </>
+              ) : (
+                <div className="px-3 py-3 text-sm">
+                  <p className="text-ink-muted">Not yet scheduled.</p>
+                  <Link href={`/planner?schedule=${job.id}`} className="btn-primary mt-2 w-full justify-center">Schedule Job</Link>
+                </div>
+              )}
+            </div>
             <div className="card">
               <h3 className="section-title border-b border-line px-3 py-2">Financial Summary</h3>
               <StatRow label="Quoted" value={fmtMoney(job.quotedFee)} />

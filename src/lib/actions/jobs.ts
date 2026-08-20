@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { nextNumber, formatJobNumber } from "@/lib/numbering";
 import { parseInputDate, fmtAddress, splitAddress } from "@/lib/format";
+import { scheduleJob } from "@/lib/actions/planner";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -46,6 +47,11 @@ export async function createJob(fd: FormData) {
   const site = siteFields(fd);
   const name = str(fd, "name") || site.siteAddress || "Untitled Job";
 
+  // Optional planner scheduling picked up from the new-job form (Section 43)
+  const plannedStartISO = str(fd, "plannedStart");
+  const plannedDuration = parseInt(str(fd, "plannedDuration")) || 1;
+  const durationUnit = str(fd, "durationUnit") === "calendar" ? "calendar" : "working";
+
   const job = await db.$transaction(async (tx) => {
     const { seq, year } = await nextNumber(tx, "job");
     const jobNumber = await formatJobNumber(seq, year);
@@ -72,6 +78,10 @@ export async function createJob(fd: FormData) {
     });
   });
   await logActivity(`Job ${job.jobNumber} created`, { jobId: job.id, clientId });
+  // Assigns planned dates, planner colour and manual order in one go.
+  if (plannedStartISO) {
+    await scheduleJob(job.id, plannedStartISO, { duration: plannedDuration, unit: durationUnit });
+  }
   revalidatePath("/jobs");
   revalidatePath("/dashboard");
   redirect(`/jobs/${job.id}`);

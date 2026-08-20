@@ -5,8 +5,8 @@ Practice-management app for **Mellan Consulting Engineers** (structural engineer
 ## Stack & Layout
 
 - Next.js 14 App Router + Prisma 5.22 (SQLite at `prisma/dev.db`) + Tailwind
-- Pages: `src/app/{dashboard,jobs,clients,tasks,inspections,calendar,quotes,invoices,settings,search,reports}/`
-- Server actions: `src/lib/actions/*.ts`; helpers: `src/lib/{db,settings,numbering,format,activity,constants}.ts`
+- Pages: `src/app/{dashboard,jobs,clients,tasks,inspections,calendar,quotes,invoices,settings,search,reports,planner}/`
+- Server actions: `src/lib/actions/*.ts`; helpers: `src/lib/{db,settings,numbering,format,activity,constants,planner}.ts`
 - Shared components: `src/components/*.tsx`
 
 ## Run / Build
@@ -44,6 +44,17 @@ All of the 5769ba6 state, plus a completed user "update request" (16 items), all
 - **Tasks**: Completed folder (`src/app/tasks/page.tsx`, `isCompletedView = view === "list" && activeList.name === "Completed" && !filter`) shows all completed tasks across lists; reopening restores the task to its original list.
 - **Finances section**: `/finances` (redirects to `/finances/quotes`) with Quotes/Invoices tabs (`src/components/FinancesTabs.tsx`); legacy `/quotes` and `/invoices` URLs unchanged and still work. Sidebar has a Finances nav item; dashboard cards link there.
 - **Jobs**: new jobs default to status "To Start"; jobs list shows merged "Project / Address" column. New-quote form has no Project field.
+
+## Job Planner module (added 2026-08-20, uncommitted on engineering-app)
+
+Visual workload scheduler/Gantt for Jobs at `/planner`:
+
+- **Schema**: `Job` gained `plannedStartDate`, `plannedEndDate`, `plannedDuration Int?`, `durationUnit String @default("working")` ("working"|"calendar"), `plannerColor String @default("")`, `plannerSortOrder Int @default(0)`, `unscheduledOrder Int @default(0)`.
+- **`src/lib/planner.ts`**: working-day maths (`addDuration`, `durationBetween`, `nextWorkingDay` — start day counts as day 1, weekends skipped for "working" unit), `PLANNER_PALETTE` + `assignPlannerColor` (least-used palette colour), `planningStatus` (completed/unscheduled/scheduled/starting-today/in-period/overdue), view windows (`viewWindow`, `stepAnchor`, `VIEW_COL_W`).
+- **`src/lib/actions/planner.ts`**: `scheduleJob` (start + duration OR start + end; auto-end; weekend starts roll to Monday; auto-colour on first schedule; logs activity), `moveJobToDate`, `resizeJobDuration`, `unscheduleJob`, `reorderPlanner` (vertical drag AND overlap resolution — same action), `reorderUnscheduled`, `movePlannerJob`, `setPlannerColor`, `updateJobPlannerMeta`. `createJob` in `jobs.ts` delegates to `scheduleJob` when planned start is set on the New Job form.
+- **`src/app/planner/page.tsx`** (server): GET filter form (engineer/status/planning status/priority/type/client + "Hide completed" default-ON via `completed=show|hide` pair), unscheduled = `plannedStartDate: null` and job status not Completed/Cancelled. Weekly workload stats strip.
+- **`src/components/PlannerBoard.tsx`** (client): rows-per-job Gantt with drag bar to reschedule (`moveJobToDate`), drag edges to resize (`resizeJobDuration`), drag row/label to reorder, drop unscheduled cards onto timeline, job popover (Change Dates, palette + custom colour, engineer, priority, Move Up/Down, Unschedule, Open Job), Schedule Job modal (SearchableSelect), unscheduled side panel (`?panel=unscheduled`), client-side Sort By (visual only — never touches manual order) + "View By Engineer" grouping. Bars: colour from DB, completed muted, overdue hatched, ◂▸ clip arrows, inspection diamonds, task ⚑ badge.
+- **Elsewhere**: Sidebar "Job Planner" entry; job detail Overview has a Planning card (colour/start/end/duration/planning status + View in Planner); New Job form has optional Planned Start/Duration/Unit; dashboard has 4 planner cards.
 
 ## User Preferences (from update request)
 
