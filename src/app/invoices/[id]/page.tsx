@@ -114,7 +114,7 @@ export default async function InvoiceDetailPage({
               description: invoice.description,
               dueDate: toInputDate(invoice.dueDate),
               notes: invoice.notes,
-              items: invoice.items.map((i) => ({ description: i.description, qty: i.qty, unitPrice: i.unitPrice })),
+              items: invoice.items.map((i) => ({ name: i.name, description: i.description, qty: i.qty, unitPrice: i.unitPrice, gst: i.gst })),
             }}
           />
         </div>

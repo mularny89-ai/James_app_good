@@ -82,6 +82,7 @@ export default async function InspectionDetailPage({ params, searchParams }: { p
           contactEmail: insp.contactEmail,
           notes: insp.notes,
           status: insp.status,
+          color: insp.color,
         }}
       />
     </div>

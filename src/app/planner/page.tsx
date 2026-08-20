@@ -203,7 +203,7 @@ export default async function PlannerPage({
   const qs = (patch: Record<string, string>) => {
     const p = new URLSearchParams();
     const merged: Record<string, string> = {
-      view, start: isoDay(startOfDay(start)), engineer, status: statusFilter, planning: planningFilter,
+      view, start: isoDay(startOfDay(anchor)), engineer, status: statusFilter, planning: planningFilter,
       priority: priorityFilter, type: typeFilter, client: clientFilter,
       completed: hideCompleted ? "hide" : "show",
       ...(panelOpen ? { panel: "unscheduled" } : {}), ...patch,
@@ -211,6 +211,17 @@ export default async function PlannerPage({
     Object.entries(merged).forEach(([k, v]) => v && p.set(k, v));
     return `/planner?${p.toString()}`;
   };
+
+  // Navigation steps from the unpadded anchor — the padded week-aligned window
+  // start would land in the previous month otherwise.
+  const anchorMonth = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const anchorMonthEnd = new Date(anchor.getFullYear(), anchor.getMonth() + 2, 1);
+  const rangeLabel =
+    view === "month"
+      ? anchorMonth.toLocaleString("en-AU", { month: "long", year: "numeric" })
+      : view === "3months"
+        ? `${anchorMonth.toLocaleString("en-AU", { month: "long" })} – ${anchorMonthEnd.toLocaleString("en-AU", { month: "long", year: "numeric" })}`
+        : `${fmtDate(windowStart)} – ${fmtDate(windowEnd)}`;
 
   return (
     <div className="p-5">
@@ -222,7 +233,7 @@ export default async function PlannerPage({
       {/* Filters — GET form, manual order in the DB is never touched (Section 48) */}
       <form method="GET" action="/planner" className="mb-3 flex flex-wrap items-end gap-2">
         <input type="hidden" name="view" value={view} />
-        <input type="hidden" name="start" value={isoDay(startOfDay(start))} />
+        <input type="hidden" name="start" value={isoDay(startOfDay(anchor))} />
         <div>
           <label className="label">Engineer</label>
           <select name="engineer" defaultValue={engineer} className="input w-40">
@@ -271,18 +282,18 @@ export default async function PlannerPage({
           Hide completed
         </label>
         <button className="btn" type="submit">Apply</button>
-        <Link href={`/planner?view=${view}&start=${isoDay(startOfDay(start))}`} className="btn">Clear</Link>
+        <Link href={`/planner?view=${view}&start=${isoDay(startOfDay(anchor))}`} className="btn">Clear</Link>
       </form>
 
       <PlannerBoard
         view={view}
         viewOptions={PLANNER_VIEWS.map((v) => ({ ...v, href: qs({ view: v.value }) }))}
         nav={{
-          prev: qs({ start: isoDay(stepAnchor(view, start, -1)) }),
+          prev: qs({ start: isoDay(stepAnchor(view, anchor, -1)) }),
           today: qs({ start: isoDay(new Date()) }),
-          next: qs({ start: isoDay(stepAnchor(view, start, 1)) }),
+          next: qs({ start: isoDay(stepAnchor(view, anchor, 1)) }),
         }}
-        rangeLabel={`${fmtDate(windowStart)} – ${fmtDate(windowEnd)}`}
+        rangeLabel={rangeLabel}
         dayCols={dayCols}
         jobs={scheduled}
         unscheduled={unscheduled}

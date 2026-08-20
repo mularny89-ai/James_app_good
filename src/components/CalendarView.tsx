@@ -3,11 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { rescheduleInspection } from "@/lib/actions/inspections";
+import { moveCalendarEvent } from "@/lib/actions/calendar";
 import { readableTextOn } from "@/lib/format";
 
 export type CalEvent = {
   id: number;
-  kind: "inspection" | "task" | "job";
+  kind: "inspection" | "task" | "job" | "event";
   date: string; // yyyy-mm-dd
   startTime: string;
   endTime: string;
@@ -19,6 +20,7 @@ export type CalEvent = {
   clientName?: string;
   href: string;
   color: string;
+  allDay?: boolean;
 };
 
 /** "09:30" -> "9:30 AM" (kept local so the client bundle stays self-contained). */
@@ -37,39 +39,51 @@ const toISO = (d: Date) => {
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+const DRAGGABLE = new Set(["inspection", "event"]);
+
 function EventChip({ ev, compact }: { ev: CalEvent; compact?: boolean }) {
   const router = useRouter();
+  const draggable = DRAGGABLE.has(ev.kind);
+  const onDragStart = (e: React.DragEvent) => e.dataTransfer.setData("text/event", JSON.stringify({ id: ev.id, kind: ev.kind }));
+  const time12 = fmtTime12(ev.startTime);
+
   if (compact) {
+    // Month view: time + address first for inspections, time + title otherwise.
+    const text = ev.kind === "inspection"
+      ? [time12, ev.address || ev.label].filter(Boolean).join(" — ")
+      : [time12, ev.label].filter(Boolean).join(" — ");
     return (
       <button
-        draggable={ev.kind === "inspection"}
-        onDragStart={(e) => e.dataTransfer.setData("text/event", JSON.stringify({ id: ev.id, kind: ev.kind }))}
+        draggable={draggable}
+        onDragStart={onDragStart}
         onClick={() => router.push(ev.href)}
         className="cal-event"
-        style={{ backgroundColor: ev.color, color: readableTextOn(ev.color), cursor: ev.kind === "inspection" ? "grab" : "pointer" }}
-        title={`${ev.startTime} ${ev.title ?? ev.label} — ${ev.sublabel}`}
+        style={{ backgroundColor: ev.color, color: readableTextOn(ev.color), cursor: draggable ? "grab" : "pointer" }}
+        title={`${time12} ${ev.title ?? ev.label} — ${ev.address ?? ev.sublabel}${ev.jobNumber ? ` · ${ev.jobNumber}` : ""}${ev.clientName ? ` · ${ev.clientName}` : ""}`}
       >
-        {ev.startTime} {ev.title ?? ev.label}{ev.jobNumber != null ? ` ${ev.jobNumber}` : ""}
+        {text}
       </button>
     );
   }
-  // Day/week blocks: event type, time, job number, address, client — in that priority.
-  const timeLabel = fmtTime12(ev.startTime) + (ev.endTime ? `–${fmtTime12(ev.endTime)}` : "");
+  // Day/week blocks — inspections lead with time then address (address outranks type);
+  // general events lead with time then the event title.
+  const timeLabel = ev.allDay ? "All day" : fmtTime12(ev.startTime) + (ev.endTime ? ` – ${fmtTime12(ev.endTime)}` : "");
   const fg = readableTextOn(ev.color);
+  const primary = ev.kind === "inspection" ? (ev.address || ev.label) : ev.label;
   return (
     <button
-      draggable={ev.kind === "inspection"}
-      onDragStart={(e) => e.dataTransfer.setData("text/event", JSON.stringify({ id: ev.id, kind: ev.kind }))}
+      draggable={draggable}
+      onDragStart={onDragStart}
       onClick={() => router.push(ev.href)}
       className="cal-event"
-      style={{ backgroundColor: ev.color, color: fg, cursor: ev.kind === "inspection" ? "grab" : "pointer", whiteSpace: "normal", overflow: "hidden" }}
+      style={{ backgroundColor: ev.color, color: fg, cursor: draggable ? "grab" : "pointer", whiteSpace: "normal", overflow: "hidden" }}
       title={`${timeLabel} ${ev.title ?? ev.label} — ${ev.address ?? ev.sublabel}${ev.clientName ? ` (${ev.clientName})` : ""}`}
     >
-      <span className="block truncate text-[11px] font-bold leading-tight">{ev.title ?? ev.label}</span>
-      {timeLabel && <span className="block truncate text-[10px] leading-tight">{timeLabel}</span>}
+      <span className="block truncate text-[11px] font-bold leading-tight">{timeLabel}</span>
+      <span className="block truncate text-[11px] font-semibold leading-tight">{primary}</span>
       {ev.jobNumber != null && <span className="block truncate text-[10px] leading-tight">{ev.jobNumber}</span>}
-      {ev.address && <span className="block truncate text-[10px] leading-tight">{ev.address}</span>}
       {ev.clientName && <span className="block truncate text-[10px] leading-tight opacity-90">{ev.clientName}</span>}
+      {ev.title && <span className="block truncate text-[10px] leading-tight opacity-80">{ev.title}</span>}
     </button>
   );
 }
@@ -109,6 +123,7 @@ export default function CalendarView({
       try {
         const { id, kind } = JSON.parse(e.dataTransfer.getData("text/event"));
         if (kind === "inspection" && iso) start(async () => rescheduleInspection(id, iso));
+        else if (kind === "event" && iso) start(async () => moveCalendarEvent(id, iso));
       } catch { /* ignore */ }
     },
   });
@@ -164,10 +179,13 @@ export default function CalendarView({
     const days: Date[] = [];
     for (let i = 0; i < dayCount; i++) { const d = new Date(start); d.setDate(start.getDate() + i); days.push(d); }
     const hours = Array.from({ length: 12 }, (_, i) => i + 6); // 06:00–17:00
+    const gridCols = dayCount === 1 ? "grid-cols-[64px_1fr]" : "grid-cols-[64px_repeat(7,1fr)]";
+    const timed = (iso: string) => eventsOn(iso).filter((e) => !e.allDay);
+    const allDay = (iso: string) => eventsOn(iso).filter((e) => e.allDay);
 
     return (
       <div className="card overflow-x-auto">
-        <div className={`grid ${dayCount === 1 ? "grid-cols-[64px_1fr]" : "grid-cols-[64px_repeat(7,1fr)]"} border-b border-line bg-gray-50`}>
+        <div className={`grid ${gridCols} border-b border-line bg-gray-50`}>
           <div />
           {days.map((d) => {
             const iso = toISO(d);
@@ -182,12 +200,25 @@ export default function CalendarView({
             );
           })}
         </div>
+        {/* All-day events */}
+        <div className={`grid ${gridCols} border-b border-line`}>
+          <div className="px-1 py-1 text-right text-xs text-ink-muted">All day</div>
+          {days.map((d) => {
+            const iso = toISO(d);
+            const evs = allDay(iso);
+            return (
+              <div key={iso} className={`min-h-[26px] border-l border-line p-0.5 ${iso === todayISO ? "today" : ""}`} {...dropHandlers(iso)}>
+                {evs.map((ev) => <EventChip key={`${ev.kind}${ev.id}`} ev={ev} />)}
+              </div>
+            );
+          })}
+        </div>
         {hours.map((h) => (
-          <div key={h} className={`grid ${dayCount === 1 ? "grid-cols-[64px_1fr]" : "grid-cols-[64px_repeat(7,1fr)]"}`}>
+          <div key={h} className={`grid ${gridCols}`}>
             <div className="px-1 py-1 text-right text-xs text-ink-muted">{String(h).padStart(2, "0")}:00</div>
             {days.map((d) => {
               const iso = toISO(d);
-              const evs = eventsOn(iso).filter((e) => parseInt(e.startTime.split(":")[0]) === h);
+              const evs = timed(iso).filter((e) => parseInt(e.startTime.split(":")[0]) === h);
               return (
                 <div key={iso} className={`min-h-[40px] border-b border-l border-line p-0.5 ${iso === todayISO ? "today" : ""}`} {...dropHandlers(iso)}>
                   {evs.map((ev) => <EventChip key={`${ev.kind}${ev.id}`} ev={ev} />)}
@@ -197,11 +228,11 @@ export default function CalendarView({
           </div>
         ))}
         {/* Events outside 06:00–17:00 */}
-        <div className={`grid ${dayCount === 1 ? "grid-cols-[64px_1fr]" : "grid-cols-[64px_repeat(7,1fr)]"}`}>
+        <div className={`grid ${gridCols}`}>
           <div className="px-1 py-1 text-right text-xs text-ink-muted">Other</div>
           {days.map((d) => {
             const iso = toISO(d);
-            const evs = eventsOn(iso).filter((e) => { const h = parseInt(e.startTime.split(":")[0]); return h < 6 || h > 17 || isNaN(h); });
+            const evs = timed(iso).filter((e) => { const h = parseInt(e.startTime.split(":")[0]); return h < 6 || h > 17 || isNaN(h); });
             return (
               <div key={iso} className={`min-h-[32px] border-l border-line p-0.5 ${iso === todayISO ? "today" : ""}`} {...dropHandlers(iso)}>
                 {evs.map((ev) => <EventChip key={`${ev.kind}${ev.id}`} ev={ev} />)}
@@ -274,7 +305,7 @@ export default function CalendarView({
           ))}
         </div>
       </div>
-      <p className="mb-2 text-xs text-ink-muted">Drag an inspection to another day to reschedule it — the change is saved immediately.</p>
+      <p className="mb-2 text-xs text-ink-muted">Drag an inspection or event to another day to reschedule it — the change is saved immediately.</p>
       {view === "month" && renderMonth()}
       {(view === "week" || view === "day") && renderWeek()}
       {view === "agenda" && renderAgenda()}

@@ -6,7 +6,7 @@ import { toInputDate } from "@/lib/format";
 import { updateQuote, setQuoteStatus, duplicateQuote, acceptQuoteAndCreateJob, archiveQuote } from "@/lib/actions/quotes";
 import { PageHeader, SoftBadge, Field } from "@/components/ui";
 import ClientSelect from "@/components/ClientSelect";
-import LineItemsEditor from "@/components/LineItemsEditor";
+import TaskItemsEditor from "@/components/TaskItemsEditor";
 import { presetOpts } from "@/lib/presets";
 import BrandDocument from "@/components/BrandDocument";
 import ConfirmButton from "@/components/ConfirmButton";
@@ -122,11 +122,13 @@ export default async function QuoteDetailPage({
             <Field label="Valid Until"><input type="date" name="validUntil" className="input" defaultValue={toInputDate(quote.validUntil)} /></Field>
           </div>
           <div>
-            <h3 className="section-title mb-2">Fee Items</h3>
-            <LineItemsEditor
-              items={quote.items.map((i) => ({ description: i.description, qty: i.qty, unitPrice: i.unitPrice }))}
+            <h3 className="section-title mb-2">Tasks</h3>
+            <TaskItemsEditor
+              items={quote.items.map((i) => ({ name: i.name, description: i.description, qty: i.qty, unitPrice: i.unitPrice, gst: i.gst }))}
               presets={presets}
               gstRate={settings.gstRate}
+              documentTitle="Quote"
+              brandColor={settings.primaryColor}
             />
           </div>
           <Field label="Internal Notes"><textarea name="notes" rows={2} className="input" defaultValue={quote.notes} /></Field>

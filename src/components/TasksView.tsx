@@ -20,6 +20,7 @@ export type TaskDTO = {
   clientName: string | null;
   listId: number;
   listName: string;
+  categoryName: string;
   completed: boolean;
   priority: string;
   important: boolean;
@@ -34,8 +35,11 @@ export type TaskDTO = {
   subtasks: { id: number; title: string; completed: boolean }[];
 };
 
-type ListOpt = { id: number; name: string };
+type CategoryGroup = { name: string; lists: { id: number; name: string }[] };
 type JobOpt = { id: number; jobNumber: string; name: string };
+
+/** Sentinel id for "Status → Completed" in the Move To dropdown. */
+const COMPLETE_ID = "__complete__";
 
 function Group({ title, tone, children }: { title: string; tone?: string; children: React.ReactNode }) {
   return (
@@ -48,13 +52,13 @@ function Group({ title, tone, children }: { title: string; tone?: string; childr
 
 function TaskRow({
   task,
-  lists,
+  categories,
   jobs,
   onExpand,
   expanded,
 }: {
   task: TaskDTO;
-  lists: ListOpt[];
+  categories: CategoryGroup[];
   jobs: JobOpt[];
   expanded: boolean;
   onExpand: (id: number | null) => void;
@@ -64,16 +68,26 @@ function TaskRow({
 
   const overdue = task.dueDate && !task.completed && new Date(task.dueDate) < new Date(new Date().toDateString());
 
+  const moveOptions = [
+    ...categories.flatMap((c) => c.lists.map((l) => ({ id: l.id, label: l.name, group: c.name }))),
+    ...(task.completed ? [] : [{ id: COMPLETE_ID, label: "Completed", group: "Status" }]),
+  ];
+  const moveCurrent = task.completed ? COMPLETE_ID : task.listId;
+
+  const onMove = async (id: number | string) => {
+    if (String(id) === COMPLETE_ID) await completeTask(task.id);
+    else await moveTaskToList(task.id, Number(id));
+  };
+
   return (
     <div className="px-3 py-1.5">
       <div className="flex items-center gap-2">
         <button
           aria-label={task.completed ? "Reopen task" : "Complete task"}
+          title={task.completed ? "Reopen" : "Complete"}
           onClick={() => start(async () => (task.completed ? reopenTask(task.id) : completeTask(task.id)))}
-          className={`flex h-4.5 w-4.5 h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border text-[10px] ${
-            task.completed ? "text-white" : "border-line hover:border-brand"
-          }`}
-          style={task.completed ? { backgroundColor: "var(--success)", borderColor: "var(--success)" } : undefined}
+          className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border text-[10px]"
+          style={task.completed ? { backgroundColor: "var(--success)", borderColor: "var(--success)", color: "#fff" } : { borderColor: "var(--line)" }}
         >
           {task.completed && "✓"}
         </button>
@@ -87,7 +101,7 @@ function TaskRow({
               </Link>
             )}
             {task.clientName && !task.jobNumber && <span>{task.clientName}</span>}
-            {task.listName && <span>{task.listName}</span>}
+            {task.listName && <span>{task.categoryName} → {task.listName}</span>}
             {task.dueDate && (
               <span className={overdue ? "font-semibold text-err" : ""}>
                 {overdue ? "Overdue: " : "Due "}{fmtDate(task.dueDate)}{task.dueTime ? ` ${task.dueTime}` : ""}
@@ -134,7 +148,7 @@ function TaskRow({
               <textarea name="description" rows={2} className="input" defaultValue={task.description} />
             </div>
             <div>
-              <label className="label">Job</label>
+              <label className="label">Job (optional)</label>
               <select name="jobId" className="input" defaultValue={task.jobId ?? ""}>
                 <option value="">No job (general task)</option>
                 {jobs.map((j) => <option key={j.id} value={j.id}>{j.jobNumber} — {j.name}</option>)}
@@ -143,7 +157,11 @@ function TaskRow({
             <div>
               <label className="label">List</label>
               <select name="listId" className="input" defaultValue={task.listId}>
-                {lists.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                {categories.map((c) => (
+                  <optgroup key={c.name} label={c.name}>
+                    {c.lists.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </optgroup>
+                ))}
               </select>
             </div>
             <div>
@@ -175,11 +193,7 @@ function TaskRow({
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
               <button type="submit" className="btn-primary">Save</button>
-              <MoveTo
-                options={lists.map((l) => ({ id: l.id, label: `Move to ${l.name}` }))}
-                current={task.listId}
-                onMove={async (listId: number) => moveTaskToList(task.id, listId)}
-              />
+              <MoveTo options={moveOptions} current={moveCurrent} onMove={onMove} />
               <button type="button" className="btn" onClick={() => start(async () => duplicateTask(task.id))}>Duplicate</button>
               <ConfirmButton label="Delete" message="Delete this task and its subtasks?" className="btn-danger"
                 onConfirm={async () => deleteTask(task.id)} />
@@ -228,16 +242,15 @@ function TaskRow({
 
 export default function TasksView({
   tasks,
-  lists,
+  categories,
   jobs,
-  jobsById,
   view,
   defaultListId,
   clientId,
   autoFocusNew,
 }: {
   tasks: TaskDTO[];
-  lists: ListOpt[];
+  categories: CategoryGroup[];
   jobs: JobOpt[];
   jobsById: Record<number, JobOpt>;
   view: string;
@@ -279,13 +292,15 @@ export default function TasksView({
     return g;
   }, [parents, view]);
 
+  const defaultListName = categories.flatMap((c) => c.lists).find((l) => l.id === defaultListId)?.name ?? "list";
+
   const renderRow = (t: TaskDTO) => (
-    <TaskRow key={t.id} task={t} lists={lists} jobs={jobs} expanded={expanded === t.id} onExpand={setExpanded} />
+    <TaskRow key={t.id} task={t} categories={categories} jobs={jobs} expanded={expanded === t.id} onExpand={setExpanded} />
   );
 
   return (
     <div>
-      {/* Quick add — Enter saves (Section 111) */}
+      {/* Quick add — Enter saves */}
       <form
         className="card mb-4 flex items-center gap-2 px-3 py-2"
         onSubmit={(e) => {
@@ -302,7 +317,7 @@ export default function TasksView({
         <span className="text-lg leading-none" style={{ color: "var(--brand-primary)" }}>+</span>
         <input
           className="w-full bg-transparent text-sm outline-none"
-          placeholder={`Add a task to ${lists.find((l) => l.id === defaultListId)?.name ?? "list"}… (Enter to save)`}
+          placeholder={`Add a task to ${defaultListName}… (Enter to save)`}
           value={newTitle}
           autoFocus={autoFocusNew}
           onChange={(e) => setNewTitle(e.target.value)}

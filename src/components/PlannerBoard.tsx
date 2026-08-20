@@ -5,12 +5,13 @@ import { useMemo, useRef, useState, useTransition, useEffect } from "react";
 import SearchableSelect from "@/components/SearchableSelect";
 import { fmtDate } from "@/lib/format";
 import {
-  PLANNER_PALETTE, VIEW_COL_W, durationBetween, fromIsoDay, unitLabel, type PlannerView,
+  PLANNER_PALETTE, VIEW_COL_W, chunkWeeks, durationBetween, fromIsoDay, unitLabel, type PlannerView,
 } from "@/lib/planner";
 import {
   scheduleJob, scheduleJobForm, moveJobToDate, resizeJobDuration, unscheduleJob,
   setPlannerColor, reorderPlanner, reorderUnscheduled, setJobEngineer, setJobPriority,
 } from "@/lib/actions/planner";
+import { PlannerMonthView, PlannerSixWeekView, PlannerThreeMonthView } from "@/components/PlannerWrappedView";
 
 export type PlannerJobData = {
   id: number;
@@ -162,6 +163,9 @@ export default function PlannerBoard({
   const unsById = useMemo(() => new Map(unscheduled.map((j) => [j.id, j])), [unscheduled]);
   const unsRows = unsOrder.map((id) => unsById.get(id)).filter((j): j is UnscheduledJobData => !!j);
 
+  // Month / 6 Weeks / 3 Months render as stacked Monday–Sunday week rows.
+  const weeks = useMemo(() => chunkWeeks(dayCols), [dayCols]);
+
   const moveInList = (list: number[], id: number, beforeId: number) => {
     const arr = list.filter((x) => x !== id);
     const idx = arr.indexOf(beforeId);
@@ -188,19 +192,12 @@ export default function PlannerBoard({
     return Math.min(nDays - 1, Math.max(0, Math.floor((e.clientX - rect.left) / colW)));
   };
 
-  const onTimelineDrop = (rowJobId: number | null) => (e: React.DragEvent) => {
-    const types = e.dataTransfer.types;
-    if (!types.includes("text/x-planner-bar") && !types.includes("text/x-unscheduled-job")) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const iso = dayCols[dayIndexAt(e)].iso;
-    const barId = parseInt(e.dataTransfer.getData("text/x-planner-bar"));
-    if (barId) {
-      start(async () => moveJobToDate(barId, iso));
-      return;
-    }
-    const unsId = parseInt(e.dataTransfer.getData("text/x-unscheduled-job"));
-    if (!unsId) return;
+  // Shared by the Week timeline and the wrapped Month/6-Week/3-Month grids.
+  const handleMoveBar = (jobId: number, iso: string) => {
+    start(async () => moveJobToDate(jobId, iso));
+  };
+
+  const handleDropUnscheduled = (unsId: number, iso: string, rowJobId: number | null) => {
     const u = unsById.get(unsId);
     if (!u) return;
     if (u.duration) {
@@ -213,6 +210,35 @@ export default function PlannerBoard({
     } else {
       setScheduleModal({ open: true, presetJobId: unsId, presetStart: iso, durationOnly: true });
     }
+  };
+
+  const handleResizeCommit = (jobId: number, endISO: string) => {
+    const j = byId.get(jobId);
+    if (!j) return;
+    const newDuration = durationBetween(fromIsoDay(j.startISO), fromIsoDay(endISO), j.unit);
+    if (newDuration > 0 && newDuration !== j.duration) {
+      start(async () => resizeJobDuration(jobId, newDuration));
+    }
+  };
+
+  const handleReorder = (arr: number[]) => {
+    setLocalOrder(arr);
+    start(async () => reorderPlanner(arr));
+  };
+
+  const onTimelineDrop = (rowJobId: number | null) => (e: React.DragEvent) => {
+    const types = e.dataTransfer.types;
+    if (!types.includes("text/x-planner-bar") && !types.includes("text/x-unscheduled-job")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const iso = dayCols[dayIndexAt(e)].iso;
+    const barId = parseInt(e.dataTransfer.getData("text/x-planner-bar"));
+    if (barId) {
+      handleMoveBar(barId, iso);
+      return;
+    }
+    const unsId = parseInt(e.dataTransfer.getData("text/x-unscheduled-job"));
+    if (unsId) handleDropUnscheduled(unsId, iso, rowJobId);
   };
 
   const acceptsTimeline = (e: React.DragEvent) =>
@@ -325,7 +351,29 @@ export default function PlannerBoard({
           <span className="rounded border border-line bg-white px-2 py-1"><b>{stats.unscheduled}</b> unscheduled</span>
         </div>
 
-        {/* Timeline grid */}
+        {/* Week = horizontal timeline; Month/6 Weeks/3 Months = wrapped weekly rows */}
+        {view !== "week" && (() => {
+          const gridProps = {
+            weeks,
+            groups,
+            hasJobs: jobs.length > 0,
+            windowStartISO,
+            windowEndISO: dayCols[nDays - 1]?.iso ?? windowStartISO,
+            handlers: {
+              localOrder,
+              onReorder: handleReorder,
+              onMoveBar: handleMoveBar,
+              onDropUnscheduled: handleDropUnscheduled,
+              onResizeCommit: handleResizeCommit,
+              onOpenJob: setPopoverId,
+            },
+          };
+          if (view === "month") return <PlannerMonthView {...gridProps} />;
+          if (view === "6weeks") return <PlannerSixWeekView {...gridProps} />;
+          return <PlannerThreeMonthView {...gridProps} />;
+        })()}
+
+        {view === "week" && (
         <div className="card overflow-x-auto">
           <div style={{ width: LABEL_W + nDays * colW }}>
             {/* Header */}
@@ -522,6 +570,7 @@ export default function PlannerBoard({
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Unscheduled Jobs panel (Sections 31–34) */}

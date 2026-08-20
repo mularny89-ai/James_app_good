@@ -154,7 +154,44 @@ export const PLANNER_VIEWS: { value: PlannerView; label: string }[] = [
   { value: "3months", label: "3 Months" },
 ];
 
-/** Column width (px) per view — bars get narrower as the zoom goes out. */
+export type BarSegment = { startISO: string; endISO: string };
+
+/**
+ * Visual segments for a job bar between planned start and end.
+ * Working-day bars break over weekends (Fri segment, then Mon segment);
+ * calendar-day bars are one continuous segment.
+ */
+export function barSegments(startISO: string, endISO: string, unit: string): BarSegment[] {
+  if (!startISO || !endISO || endISO < startISO) return [];
+  if (unit === "calendar") return [{ startISO, endISO }];
+  const segs: BarSegment[] = [];
+  let cur: BarSegment | null = null;
+  let d = fromIsoDay(startISO);
+  const end = fromIsoDay(endISO);
+  while (d.getTime() <= end.getTime()) {
+    if (isWeekend(d)) {
+      cur = null;
+    } else {
+      const iso = isoDay(d);
+      if (cur) cur.endISO = iso;
+      else {
+        cur = { startISO: iso, endISO: iso };
+        segs.push(cur);
+      }
+    }
+    d = addDaysLocal(d, 1);
+  }
+  return segs;
+}
+
+/** Split Monday-aligned day columns into week rows of 7. */
+export function chunkWeeks<T>(cols: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < cols.length; i += 7) out.push(cols.slice(i, i + 7));
+  return out;
+}
+
+/** Column width (px) per view — only the Week timeline uses fixed-width columns. */
 export const VIEW_COL_W: Record<PlannerView, number> = {
   week: 128,
   month: 44,
@@ -162,18 +199,33 @@ export const VIEW_COL_W: Record<PlannerView, number> = {
   "3months": 18,
 };
 
-/** Window [start, days] for a view anchored at `anchor`. */
+/** Sunday of the week containing `d`. */
+function endOfWeekSunday(d: Date): Date {
+  return addDaysLocal(startOfMonday(d), 6);
+}
+
+function daysBetween(a: Date, b: Date): number {
+  return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / 86400000) + 1;
+}
+
+/**
+ * Window [start, days] for a view anchored at `anchor`.
+ * Month / 6 Weeks / 3 Months always start on a Monday and span whole weeks
+ * so the date axis wraps into 7-column week rows (never one long strip).
+ */
 export function viewWindow(view: PlannerView, anchor: Date): { start: Date; days: number } {
   if (view === "week") return { start: startOfMonday(anchor), days: 7 };
   if (view === "month") {
-    const s = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-    const days = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0).getDate();
-    return { start: s, days };
+    const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    const last = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
+    const s = startOfMonday(first);
+    return { start: s, days: daysBetween(s, endOfWeekSunday(last)) };
   }
   if (view === "6weeks") return { start: startOfMonday(anchor), days: 42 };
-  const s = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-  const end = new Date(anchor.getFullYear(), anchor.getMonth() + 3, 0);
-  return { start: s, days: Math.round((end.getTime() - s.getTime()) / 86400000) + 1 };
+  const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const last = new Date(anchor.getFullYear(), anchor.getMonth() + 3, 0);
+  const s = startOfMonday(first);
+  return { start: s, days: daysBetween(s, endOfWeekSunday(last)) };
 }
 
 /** Advance/rewind the anchor by one view-length step. */

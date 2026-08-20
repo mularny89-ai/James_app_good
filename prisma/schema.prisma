@@ -81,6 +81,8 @@ model JobType {
 model TaskList {
   id       Int     @id @default(autoincrement())
   name     String  @unique
+  // Top-level category the list belongs to: Jobs | Forms | Finances | General
+  category String  @default("General")
   order    Int     @default(0)
   isSystem Boolean @default(false)
   tasks    Task[]
@@ -113,6 +115,7 @@ model Client {
   invoices       Invoice[]
   tasks          Task[]
   activities     Activity[]
+  calendarEvents CalendarEvent[]
 }
 
 // ---------- Quotes ----------
@@ -146,10 +149,13 @@ model QuoteItem {
   id          Int   @id @default(autoincrement())
   quoteId     Int
   quote       Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  // Task heading, kept separate from the longer description
+  name        String @default("")
   description String
   qty         Float @default(1)
   unitPrice   Float @default(0)
   amount      Float @default(0)
+  gst         Boolean @default(true)
   order       Int   @default(0)
 }
 
@@ -205,6 +211,7 @@ model Job {
   jobNotes       JobNote[]
   documents      Document[]
   activities     Activity[]
+  calendarEvents CalendarEvent[]
 }
 
 // ---------- Tasks ----------
@@ -257,7 +264,30 @@ model SiteInspection {
   contactEmail  String          @default("")
   notes         String          @default("")
   status        String          @default("Scheduled") // Scheduled | Confirmed | Completed | Cancelled | Rescheduled
+  // Manual colour override; "" inherits the linked job's planner colour
+  color         String          @default("")
   createdAt     DateTime        @default(now())
+}
+
+// ---------- General / personal calendar events (meetings, blocked time, ...) ----------
+
+model CalendarEvent {
+  id        Int      @id @default(autoincrement())
+  title     String
+  // Site Inspection | Meeting | Personal Appointment | Phone Call | Reminder | Blocked Time | Other
+  type      String   @default("Other")
+  date      DateTime
+  startTime String   @default("09:00")
+  endTime   String   @default("")
+  allDay    Boolean  @default(false)
+  location  String   @default("")
+  notes     String   @default("")
+  color     String   @default("#2563eb")
+  jobId     Int?
+  job       Job?     @relation(fields: [jobId], references: [id])
+  clientId  Int?
+  client    Client?  @relation(fields: [clientId], references: [id])
+  createdAt DateTime @default(now())
 }
 
 // ---------- Invoices ----------
@@ -291,10 +321,13 @@ model InvoiceItem {
   id          Int     @id @default(autoincrement())
   invoiceId   Int
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  // Task heading, kept separate from the longer description
+  name        String  @default("")
   description String
   qty         Float   @default(1)
   unitPrice   Float   @default(0)
   amount      Float   @default(0)
+  gst         Boolean @default(true)
   order       Int     @default(0)
 }
 

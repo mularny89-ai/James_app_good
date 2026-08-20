@@ -37,7 +37,7 @@ export default function BrandDocument({
   siteAddress?: string;
   project?: string;
   scope?: string;
-  items: { description: string; qty: number; unitPrice: number; amount: number }[];
+  items: { name?: string; description: string; qty: number; unitPrice: number; amount: number }[];
   subtotal: number;
   gst: number;
   total: number;
@@ -104,41 +104,36 @@ export default function BrandDocument({
         </div>
       )}
 
-      {/* Line items */}
-      <table className="mt-4 w-full">
-        <thead>
-          <tr className="text-left text-xs uppercase tracking-wide text-white" style={{ backgroundColor: "var(--brand-primary)" }}>
-            <th className="px-2 py-1.5">Description</th>
-            <th className="w-16 px-2 py-1.5 text-right">Qty</th>
-            <th className="w-28 px-2 py-1.5 text-right">Unit Price</th>
-            <th className="w-28 px-2 py-1.5 text-right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((it, i) => (
-            <tr key={i} className="border-b border-line">
-              <td className="px-2 py-1.5">{it.description}</td>
-              <td className="px-2 py-1.5 text-right">{it.qty}</td>
-              <td className="px-2 py-1.5 text-right">{fmtMoney(it.unitPrice)}</td>
-              <td className="px-2 py-1.5 text-right font-medium">{fmtMoney(it.amount)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colSpan={3} className="px-2 py-1 text-right text-ink-muted">Subtotal (ex GST)</td>
-            <td className="px-2 py-1 text-right">{fmtMoney(subtotal)}</td>
-          </tr>
-          <tr>
-            <td colSpan={3} className="px-2 py-1 text-right text-ink-muted">GST ({gstRate}%)</td>
-            <td className="px-2 py-1 text-right">{fmtMoney(gst)}</td>
-          </tr>
-          <tr className="text-base font-bold" style={{ color: "var(--brand-primary)" }}>
-            <td colSpan={3} className="px-2 py-1.5 text-right">Total (inc GST)</td>
-            <td className="px-2 py-1.5 text-right">{fmtMoney(total)}</td>
-          </tr>
-        </tfoot>
-      </table>
+      {/* Tasks */}
+      <div className="mt-4">
+        <div className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--brand-primary)" }}>Tasks</div>
+        {items.map((it, i) => (
+          <div key={i} className="border-b border-line py-2">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="font-bold">{it.name || it.description}</div>
+                {it.name && it.description && (
+                  <p className="mt-0.5 whitespace-pre-wrap text-xs text-ink-muted">{it.description}</p>
+                )}
+              </div>
+              <div className="shrink-0 text-right text-xs text-ink-muted">
+                Qty {it.qty} | Rate {fmtMoney(it.unitPrice)} | Amount <span className="font-semibold text-ink">{fmtMoney(it.amount)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+        <div className="ml-auto mt-2 w-64">
+          <div className="flex justify-between px-2 py-1 text-right text-ink-muted">
+            <span>Subtotal (ex GST)</span><span>{fmtMoney(subtotal)}</span>
+          </div>
+          <div className="flex justify-between px-2 py-1 text-right text-ink-muted">
+            <span>GST ({gstRate}%)</span><span>{fmtMoney(gst)}</span>
+          </div>
+          <div className="flex justify-between px-2 py-1.5 text-right text-base font-bold" style={{ color: "var(--brand-primary)" }}>
+            <span>Total (inc GST)</span><span>{fmtMoney(total)}</span>
+          </div>
+        </div>
+      </div>
 
       {exclusions && (
         <div className="mt-4">

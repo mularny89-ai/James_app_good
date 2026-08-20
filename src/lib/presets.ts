@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import type { PresetOpt } from "@/components/LineItemsEditor";
+import type { PresetOpt } from "@/components/TaskItemsEditor";
 
-/** Active invoice presets formatted for the line-item dropdown. */
+/** Active presets formatted for the task dropdown on quotes and invoices. */
 export async function presetOpts(): Promise<PresetOpt[]> {
   const ps = await db.invoicePreset.findMany({ where: { active: true }, orderBy: [{ order: "asc" }, { name: "asc" }] });
   return ps.map((p) => ({
@@ -11,5 +11,6 @@ export async function presetOpts(): Promise<PresetOpt[]> {
     description: p.description || p.name,
     qty: p.defaultQty,
     unitPrice: p.unitPrice,
+    gstApplicable: p.gstApplicable,
   }));
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import TasksView, { TaskDTO } from "@/components/TasksView";
 import { startOfDay, endOfDay } from "@/lib/format";
+import { TASK_CATEGORIES } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ const SMART_VIEWS = [
   { key: "myday", label: "My Day", icon: "☀" },
   { key: "important", label: "Important", icon: "★" },
   { key: "planned", label: "Planned", icon: "◷" },
+  { key: "completed", label: "Completed", icon: "✓" },
 ];
 
 export default async function TasksPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
@@ -22,6 +24,14 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
     db.taskList.findMany({ orderBy: { order: "asc" } }),
     db.job.findMany({ where: { archived: false }, select: { id: true, jobNumber: true, name: true }, orderBy: { jobNumber: "desc" }, take: 500 }),
   ]);
+
+  // Category groups for the sidebar + Move To dropdown (preserves TASK_CATEGORIES order)
+  const knownCats = new Set<string>(TASK_CATEGORIES);
+  const extraCats = lists.map((l) => l.category || "General").filter((c, i, a) => !knownCats.has(c) && a.indexOf(c) === i);
+  const catNames = [...TASK_CATEGORIES, ...extraCats];
+  const categories = catNames
+    .map((name) => ({ name, lists: lists.filter((l) => (l.category || "General") === name) }))
+    .filter((c) => c.lists.length > 0);
 
   // Build the query for the active view
   const where: any = {};
@@ -40,17 +50,16 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
     where.completed = false;
     heading = "Important";
   } else if (view === "planned") {
+    where.completed = false;
     heading = "Planned";
+  } else if (view === "completed") {
+    // Completed is a cross-category smart view: every completed task, from all lists.
+    where.completed = true;
+    heading = "Completed";
   } else if (view === "list" && listId) {
     activeList = lists.find((l) => l.id === listId) ?? lists[0];
     heading = activeList.name;
-    if (activeList.name === "Completed") {
-      // "Completed" is a virtual folder: every completed task lands here,
-      // regardless of which list it belongs to.
-      where.completed = true;
-    } else {
-      where.listId = listId;
-    }
+    where.listId = listId;
   }
 
   if (filter === "overdue") {
@@ -70,7 +79,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
 
   if (clientId) where.clientId = clientId;
 
-  const isCompletedView = view === "list" && activeList.name === "Completed" && !filter;
+  const isCompletedView = view === "completed";
   const raw = await db.task.findMany({
     where,
     include: {
@@ -94,6 +103,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
     clientName: t.client?.name ?? null,
     listId: t.listId,
     listName: t.list.name,
+    categoryName: t.list.category || "General",
     completed: t.completed,
     priority: t.priority,
     important: t.important,
@@ -111,16 +121,17 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
   const counts = {
     myday: await db.task.count({ where: { inMyDay: true, completed: false } }),
     important: await db.task.count({ where: { important: true, completed: false } }),
+    completed: await db.task.count({ where: { completed: true } }),
     overdue: await db.task.count({ where: { completed: false, dueDate: { lt: todayStart } } }),
   };
 
-  const defaultListId = view === "list" && listId ? listId : (lists.find((l) => l.name === "General To Do")?.id ?? lists[0].id);
+  const defaultListId = view === "list" && listId ? listId : (lists.find((l) => l.name === "General To Do")?.id ?? lists[0]?.id);
 
   return (
     <div className="flex h-full">
       {/* Task lists sidebar */}
       <aside className="w-56 shrink-0 overflow-y-auto border-r border-line bg-white py-3">
-        <div className="px-3 pb-2 text-xs font-bold uppercase tracking-wide text-ink-muted">Smart Lists</div>
+        <div className="px-3 pb-2 text-xs font-bold uppercase tracking-wide text-ink-muted">Smart Views</div>
         {SMART_VIEWS.map((v) => (
           <Link
             key={v.key}
@@ -132,20 +143,25 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
             <span className="flex-1">{v.label}</span>
             {v.key === "myday" && counts.myday > 0 && <span className="text-xs">{counts.myday}</span>}
             {v.key === "important" && counts.important > 0 && <span className="text-xs">{counts.important}</span>}
+            {v.key === "completed" && counts.completed > 0 && <span className="text-xs">{counts.completed}</span>}
           </Link>
         ))}
 
-        <div className="mt-3 px-3 pb-2 text-xs font-bold uppercase tracking-wide text-ink-muted">Lists</div>
-        {lists.map((l) => (
-          <Link
-            key={l.id}
-            href={`/tasks?view=list&list=${l.id}`}
-            className={`mx-2 mb-0.5 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm ${view === "list" && listId === l.id ? "font-medium text-white" : "hover:bg-gray-100"}`}
-            style={view === "list" && listId === l.id ? { backgroundColor: "var(--brand-primary)" } : undefined}
-          >
-            <span>≡</span>
-            <span className="flex-1 truncate">{l.name}</span>
-          </Link>
+        {categories.map((cat) => (
+          <div key={cat.name}>
+            <div className="mt-3 px-3 pb-1 text-xs font-bold uppercase tracking-wide text-ink-muted">{cat.name}</div>
+            {cat.lists.map((l) => (
+              <Link
+                key={l.id}
+                href={`/tasks?view=list&list=${l.id}`}
+                className={`mx-2 mb-0.5 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm ${view === "list" && listId === l.id ? "font-medium text-white" : "hover:bg-gray-100"}`}
+                style={view === "list" && listId === l.id ? { backgroundColor: "var(--brand-primary)" } : undefined}
+              >
+                <span>≡</span>
+                <span className="flex-1 truncate">{l.name}</span>
+              </Link>
+            ))}
+          </div>
         ))}
         <p className="mx-3 mt-2 text-xs text-ink-muted">
           Manage lists in <Link href="/settings?tab=lists" className="link">Settings</Link>.
@@ -172,7 +188,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
         <h1 className="mb-4 text-lg font-semibold">{heading}</h1>
         <TasksView
           tasks={tasks}
-          lists={lists.map((l) => ({ id: l.id, name: l.name }))}
+          categories={categories.map((c) => ({ name: c.name, lists: c.lists.map((l) => ({ id: l.id, name: l.name })) }))}
           jobs={jobs}
           jobsById={Object.fromEntries(jobs.map((j) => [j.id, j]))}
           view={view}

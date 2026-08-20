@@ -8,7 +8,7 @@ import { db } from "../src/lib/db";
 import { formatNumber, formatJobNumber, formatQuoteNumber, nextNumber, peekNextJobNumber, peekNextQuoteNumber } from "../src/lib/numbering";
 import { getSettings } from "../src/lib/settings";
 import { fmtAddress, readableTextOn, splitAddress } from "../src/lib/format";
-import { addDuration, durationBetween, fromIsoDay, isoDay, nextWorkingDay, isWeekend } from "../src/lib/planner";
+import { addDuration, durationBetween, fromIsoDay, isoDay, nextWorkingDay, isWeekend, barSegments, viewWindow, chunkWeeks, stepAnchor } from "../src/lib/planner";
 
 let passed = 0;
 let failed = 0;
@@ -47,6 +47,47 @@ async function main() {
   eq("calendar days continue over weekend", computeEnd("2026-08-27", 5, "calendar"), "2026-08-31");
   eq("duration included end (working)", durationBetween(fromIsoDay("2026-08-27"), fromIsoDay("2026-09-02"), "working"), 5);
   eq("duration (calendar)", durationBetween(fromIsoDay("2026-08-27"), fromIsoDay("2026-08-31"), "calendar"), 5);
+
+  // ---------- Wrapped weekly-row planner views (Sections 28–32) ----------
+  // View windows are Monday-aligned whole weeks so the axis wraps into 7-column rows.
+  const july = viewWindow("month", fromIsoDay("2026-07-15"));
+  eq("month view starts Monday 29 Jun 2026", isoDay(july.start), "2026-06-29");
+  eq("month view spans 5 weeks (35 days)", july.days, 35);
+  eq("month window divisible into week rows", july.days % 7, 0);
+  const aug = viewWindow("month", fromIsoDay("2026-08-01"));
+  eq("Aug 2026 month view starts Mon 27 Jul", isoDay(aug.start), "2026-07-27");
+  // Aug 31 is a Monday, so the final week row runs through Sun 6 Sep (6 rows).
+  eq("Aug 2026 month view ends Sun 6 Sep", isoDay(addDuration(aug.start, aug.days, "calendar")), "2026-09-06");
+  const six = viewWindow("6weeks", fromIsoDay("2026-08-20"));
+  eq("6-week view starts on a Monday", six.start.getDay(), 1);
+  eq("6-week view is exactly 6 weeks", six.days, 42);
+  eq("6-week view chunks into 6 rows", chunkWeeks(Array.from({ length: six.days })).length, 6);
+  const three = viewWindow("3months", fromIsoDay("2026-07-15"));
+  eq("3-month view starts Mon 29 Jun 2026", isoDay(three.start), "2026-06-29");
+  eq("3-month view ends Sun 4 Oct 2026", isoDay(addDuration(three.start, three.days, "calendar")), "2026-10-04");
+  eq("3-month window divisible into week rows", three.days % 7, 0);
+  const wk = viewWindow("week", fromIsoDay("2026-08-20"));
+  eq("week view unchanged: 7 days from Monday", wk.days, 7);
+  eq("week view starts Mon 17 Aug 2026", isoDay(wk.start), "2026-08-17");
+
+  // Navigation: month/6w/3m step by whole periods.
+  eq("month nav next from July -> Aug 1", isoDay(stepAnchor("month", fromIsoDay("2026-07-15"), 1)), "2026-08-01");
+  eq("month nav prev from July -> Jun 1", isoDay(stepAnchor("month", fromIsoDay("2026-07-15"), -1)), "2026-06-01");
+  eq("6-week nav next is +42 days", isoDay(stepAnchor("6weeks", fromIsoDay("2026-08-17"), 1)), "2026-09-28");
+  eq("3-month nav next Jul -> Oct 1", isoDay(stepAnchor("3months", fromIsoDay("2026-07-15"), 1)), "2026-10-01");
+
+  // Bar segmentation: working-day bars break over weekends; week-row wrap splits them.
+  const mw = barSegments("2026-07-09", "2026-07-15", "working"); // Thu 9 Jul + 5 wd
+  eq("multi-week job splits into 2 segments", mw.length, 2);
+  eq("segment 1 Thu 9 - Fri 10 Jul", mw[0].startISO + "/" + mw[0].endISO, "2026-07-09/2026-07-10");
+  eq("segment 2 Mon 13 - Wed 15 Jul", mw[1].startISO + "/" + mw[1].endISO, "2026-07-13/2026-07-15");
+  const cal = barSegments("2026-07-09", "2026-07-15", "calendar");
+  eq("calendar-day job is one continuous segment", cal.length, 1);
+  eq("calendar segment spans the weekend", cal[0].startISO + "/" + cal[0].endISO, "2026-07-09/2026-07-15");
+  const fri2 = barSegments("2026-07-10", "2026-07-13", "working"); // Fri + 2 wd = Fri + Mon
+  eq("Fri + 2wd: Fri segment only", fri2[0].startISO + "/" + fri2[0].endISO, "2026-07-10/2026-07-10");
+  eq("Fri + 2wd: Mon segment only", fri2[1].startISO + "/" + fri2[1].endISO, "2026-07-13/2026-07-13");
+  eq("weekend start produces no segment days", barSegments("2026-07-11", "2026-07-12", "working").length, 0);
 
   // peek helpers must return the next number WITHOUT consuming it
   const peekedJob = await peekNextJobNumber();

@@ -40,6 +40,7 @@ export async function createInspection(fd: FormData) {
       contactEmail: str(fd, "contactEmail"),
       notes: str(fd, "notes"),
       status: str(fd, "status") || "Scheduled",
+      color: str(fd, "color"), // "" inherits the job's planner colour
     },
   });
   if (job) {
@@ -79,6 +80,7 @@ export async function updateInspection(id: number, fd: FormData) {
       contactEmail: str(fd, "contactEmail"),
       notes: str(fd, "notes"),
       status: str(fd, "status") || insp.status,
+      color: str(fd, "color"), // "" inherits the job's planner colour
     },
   });
   revalidateAll(insp.jobId);

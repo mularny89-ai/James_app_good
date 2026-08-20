@@ -10,20 +10,39 @@ import { redirect } from "next/navigation";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
-type LineItem = { description: string; qty: number; unitPrice: number };
+type LineItem = { name: string; description: string; qty: number; unitPrice: number; gst: boolean };
 
+/** Tasks are serialised by the TaskItemsEditor as JSON in `itemsJson`.
+ *  Each task snapshots its values at save time — later preset edits never
+ *  rewrite historical invoices. */
 function parseItems(fd: FormData): LineItem[] {
+  const raw = String(fd.get("itemsJson") ?? "");
+  if (raw) {
+    try {
+      const arr = JSON.parse(raw) as any[];
+      return arr
+        .map((it) => ({
+          name: String(it.name ?? "").trim(),
+          description: String(it.description ?? "").trim(),
+          qty: Number(it.qty) || 0,
+          unitPrice: Number(it.unitPrice) || 0,
+          gst: it.gst !== false,
+        }))
+        .filter((it) => it.name !== "" || it.description !== "");
+    } catch { /* fall through to legacy parsing */ }
+  }
+  // Legacy line-item fields (old editor)
   const descriptions = fd.getAll("itemDescription").map(String);
   const qtys = fd.getAll("itemQty").map((v) => parseFloat(String(v)) || 0);
   const prices = fd.getAll("itemPrice").map((v) => parseFloat(String(v)) || 0);
   return descriptions
-    .map((d, i) => ({ description: d.trim(), qty: qtys[i] ?? 1, unitPrice: prices[i] ?? 0 }))
+    .map((d, i) => ({ name: "", description: d.trim(), qty: qtys[i] ?? 1, unitPrice: prices[i] ?? 0, gst: true }))
     .filter((it) => it.description !== "");
 }
 
 function totals(items: LineItem[], gstRate: number) {
   const subtotal = items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
-  const gst = subtotal * (gstRate / 100);
+  const gst = items.reduce((s, it) => s + (it.gst ? it.qty * it.unitPrice : 0), 0) * (gstRate / 100);
   return { subtotal, gst, total: subtotal + gst };
 }
 
@@ -65,7 +84,7 @@ export async function createInvoice(fd: FormData) {
         total: t.total,
         items: {
           create: items.map((it, i) => ({
-            description: it.description, qty: it.qty, unitPrice: it.unitPrice,
+            name: it.name, description: it.description, qty: it.qty, unitPrice: it.unitPrice, gst: it.gst,
             amount: it.qty * it.unitPrice, order: i,
           })),
         },
@@ -98,7 +117,7 @@ export async function updateInvoice(id: number, fd: FormData) {
         total: t.total,
         items: {
           create: items.map((it, i) => ({
-            description: it.description, qty: it.qty, unitPrice: it.unitPrice,
+            name: it.name, description: it.description, qty: it.qty, unitPrice: it.unitPrice, gst: it.gst,
             amount: it.qty * it.unitPrice, order: i,
           })),
         },

@@ -27,12 +27,28 @@ const jobTypes = [
   "Form 15", "Form 12", "Remedial Engineering", "Commercial", "Other",
 ];
 
+// Task hierarchy: Category → List. "Completed" is a smart view, not a list.
+// name, category, order, isSystem
 const taskLists = [
-  ["General To Do", 1, true],
-  ["Jobs To Start", 2, true],
-  ["Jobs In Progress", 3, true],
-  ["Jobs To Finalise", 4, true],
-  ["Completed", 5, true],
+  ["Jobs To Start", "Jobs", 1, true],
+  ["Jobs In Progress", "Jobs", 2, true],
+  ["Jobs To Be Revised", "Jobs", 3, true],
+  ["Jobs To Finalise", "Jobs", 4, true],
+  ["Form 15's To Be Issued", "Forms", 1, true],
+  ["Form 12's To Be Issued", "Forms", 2, true],
+  ["Quotes To Be Issued", "Finances", 1, true],
+  ["Invoices To Be Issued", "Finances", 2, true],
+  ["General To Do", "General", 1, true],
+];
+
+// Common service presets shared by quotes and invoices (editable in Settings)
+const presets = [
+  ["Structural Engineering Design", "Structural engineering design and documentation.", 0, true, 1, 1],
+  ["Site Inspection", "Site inspections are charged at $400 + GST per inspection.", 400, true, 1, 2],
+  ["Form 15", "Form 15 — Design/Compliance Certificate.", 0, true, 1, 3],
+  ["Form 12", "Form 12 — Inspection Certificate.", 0, true, 1, 4],
+  ["Structural Report", "Structural engineering report.", 0, true, 1, 5],
+  ["Engineering Variation", "Variation to the engaged scope of works.", 0, true, 1, 6],
 ];
 
 const inspectionTypes = [
@@ -56,8 +72,31 @@ async function main() {
   for (let i = 0; i < jobTypes.length; i++) {
     await prisma.jobType.upsert({ where: { name: jobTypes[i] }, update: {}, create: { name: jobTypes[i], order: i + 1 } });
   }
-  for (const [name, order, isSystem] of taskLists) {
-    await prisma.taskList.upsert({ where: { name }, update: {}, create: { name, order, isSystem } });
+  // Upsert the task hierarchy. Then migrate any legacy "Completed" task list:
+  // its tasks are marked completed and moved to General To Do, and the list
+  // is removed (Completed is now a smart view, not a list).
+  let generalId = null;
+  for (const [name, category, order, isSystem] of taskLists) {
+    const created = await prisma.taskList.upsert({
+      where: { name },
+      update: { category, order, isSystem },
+      create: { name, category, order, isSystem },
+    });
+    if (name === "General To Do") generalId = created.id;
+  }
+  const legacyCompleted = await prisma.taskList.findUnique({ where: { name: "Completed" } });
+  if (legacyCompleted) {
+    await prisma.task.updateMany({
+      where: { listId: legacyCompleted.id },
+      data: { listId: generalId, completed: true, completedAt: new Date() },
+    });
+    await prisma.taskList.delete({ where: { id: legacyCompleted.id } });
+  }
+  for (const [name, description, unitPrice, gstApplicable, defaultQty, order] of presets) {
+    const existing = await prisma.invoicePreset.findFirst({ where: { name }, select: { id: true } });
+    if (!existing) {
+      await prisma.invoicePreset.create({ data: { name, description, unitPrice, gstApplicable, defaultQty, order } });
+    }
   }
   for (let i = 0; i < inspectionTypes.length; i++) {
     await prisma.inspectionType.upsert({ where: { name: inspectionTypes[i] }, update: {}, create: { name: inspectionTypes[i], order: i + 1 } });

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import SearchableSelect from "@/components/SearchableSelect";
+import ColorPicker from "@/components/ColorPicker";
 import { Field } from "@/components/ui";
 import { INSPECTION_STATUSES } from "@/lib/constants";
 
@@ -34,6 +35,7 @@ export type InspectionDTO = {
   contactEmail: string;
   notes: string;
   status: string;
+  color: string;
 };
 
 /** Section 45/79: selecting a job auto-populates client, address and contacts. */
@@ -117,6 +119,9 @@ export default function InspectionForm({
           <select name="status" className="input" defaultValue={inspection?.status ?? "Scheduled"}>
             {INSPECTION_STATUSES.map((s) => <option key={s}>{s}</option>)}
           </select>
+        </Field>
+        <Field label="Colour" className="sm:col-span-2">
+          <ColorPicker name="color" defaultValue={inspection?.color ?? ""} allowInherit />
         </Field>
         <Field label="Notes" className="sm:col-span-2">
           <textarea name="notes" rows={3} className="input" defaultValue={inspection?.notes ?? ""} />

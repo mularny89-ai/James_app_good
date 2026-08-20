@@ -8,6 +8,27 @@ export const INSPECTION_STATUSES = ["Scheduled", "Confirmed", "Completed", "Canc
 
 export const RECURRENCE_OPTIONS = ["", "daily", "weekly", "monthly", "yearly"] as const;
 
+/** Task hierarchy: every list belongs to one of these top-level categories. */
+export const TASK_CATEGORIES = ["Jobs", "Forms", "Finances", "General"] as const;
+
+/** General/personal calendar event types (site inspections stay specialised). */
+export const CALENDAR_EVENT_TYPES = [
+  "Meeting", "Personal Appointment", "Phone Call", "Reminder", "Blocked Time", "Other",
+] as const;
+
+/** Restrained, professional palette for calendar events. */
+export const CALENDAR_COLOR_PALETTE = [
+  { name: "Blue", value: "#2563eb" },
+  { name: "Indigo", value: "#4f46e5" },
+  { name: "Purple", value: "#7c3aed" },
+  { name: "Green", value: "#15803d" },
+  { name: "Teal", value: "#0f766e" },
+  { name: "Orange", value: "#d97706" },
+  { name: "Amber", value: "#b45309" },
+  { name: "Red", value: "#b91c1c" },
+  { name: "Grey", value: "#64748b" },
+] as const;
+
 export const DOCUMENT_CATEGORIES = [
   "Architectural Drawings", "Building Plans", "Survey", "Soil Test", "Structural Drawings",
   "Engineering Calculations", "Site Photos", "Form 15", "Form 12", "Reports",

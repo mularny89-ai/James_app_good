@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import SearchableSelect from "@/components/SearchableSelect";
-import LineItemsEditor, { LineItemRow, PresetOpt } from "@/components/LineItemsEditor";
+import TaskItemsEditor, { TaskItemRow, PresetOpt } from "@/components/TaskItemsEditor";
 import { Field } from "@/components/ui";
 
 type JobOpt = {
@@ -36,15 +36,15 @@ export default function InvoiceForm({
     description: string;
     dueDate: string;
     notes: string;
-    items: LineItemRow[];
+    items: TaskItemRow[];
   };
   submitLabel?: string;
 }) {
   const initialJob = jobs.find((j) => j.id === (invoice?.jobId ?? defaultJobId)) ?? null;
   const [job, setJob] = useState<JobOpt | null>(initialJob);
 
-  const defaultItems: LineItemRow[] = invoice?.items ?? (job
-    ? [{ description: `Structural engineering services — Job ${job.jobNumber} (${job.name})`, qty: 1, unitPrice: Math.max(job.remainingFee, 0) }]
+  const defaultItems: TaskItemRow[] = invoice?.items ?? (job
+    ? [{ name: "Structural Engineering Services", description: `Job ${job.jobNumber} (${job.name})`, qty: 1, unitPrice: Math.max(job.remainingFee, 0), gst: true }]
     : []);
 
   return (
@@ -83,8 +83,8 @@ export default function InvoiceForm({
       )}
 
       <div>
-        <h3 className="section-title mb-2">Line Items</h3>
-        <LineItemsEditor items={defaultItems} gstRate={gstRate} presets={presets} />
+        <h3 className="section-title mb-2">Tasks</h3>
+        <TaskItemsEditor items={defaultItems} gstRate={gstRate} presets={presets} documentTitle="Invoice" />
       </div>
 
       <Field label="Notes"><textarea name="notes" rows={2} className="input" defaultValue={invoice?.notes ?? ""} /></Field>

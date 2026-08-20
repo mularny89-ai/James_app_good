@@ -4,7 +4,7 @@ import { peekNextQuoteNumber } from "@/lib/numbering";
 import { getSettings } from "@/lib/settings";
 import { PageHeader, Field } from "@/components/ui";
 import ClientSelect from "@/components/ClientSelect";
-import LineItemsEditor from "@/components/LineItemsEditor";
+import TaskItemsEditor from "@/components/TaskItemsEditor";
 import { presetOpts } from "@/lib/presets";
 
 export const dynamic = "force-dynamic";
@@ -52,8 +52,9 @@ export default async function NewQuotePage({ searchParams }: { searchParams: Rec
           </div>
 
           <div>
-            <h3 className="section-title mb-2">Fee Items</h3>
-            <LineItemsEditor items={[]} gstRate={settings.gstRate} presets={presets} />
+            <h3 className="section-title mb-2">Tasks</h3>
+            <p className="mb-2 text-xs text-ink-muted">Add tasks from presets or create custom tasks. Task name appears as the heading on the quote.</p>
+            <TaskItemsEditor items={[]} gstRate={settings.gstRate} presets={presets} documentTitle="Quote" brandColor={settings.primaryColor} />
           </div>
 
           <Field label="Internal Notes"><textarea name="notes" rows={2} className="input" /></Field>
