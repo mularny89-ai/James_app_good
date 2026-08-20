@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
-import { parseInputDate } from "@/lib/format";
+import { parseInputDate, fmtDate, fmtTime } from "@/lib/format";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -44,10 +44,16 @@ export async function createInspection(fd: FormData) {
   });
   if (job) {
     const typeLabel = type?.name ?? "Site inspection";
-    await logActivity(`${typeLabel} booked for ${str(fd, "date")} on Job ${job.jobNumber}`, { jobId: job.id });
+    await logActivity(
+      `${typeLabel} scheduled for ${fmtDate(insp.date)} at ${fmtTime(insp.startTime)}`,
+      { jobId: job.id }
+    );
   }
   revalidateAll(job?.id);
-  redirect(`/inspections/${insp.id}`);
+  // Close the form: return to the screen the user came from, with a success flag.
+  const returnTo = str(fd, "returnTo");
+  if (returnTo === "calendar") redirect(`/calendar?scheduled=1&date=${str(fd, "date")}`);
+  redirect(`/inspections/${insp.id}?created=1`);
 }
 
 export async function updateInspection(id: number, fd: FormData) {
@@ -79,10 +85,15 @@ export async function updateInspection(id: number, fd: FormData) {
 }
 
 export async function setInspectionStatus(id: number, status: string) {
-  const insp = await db.siteInspection.findUniqueOrThrow({ where: { id }, include: { job: true } });
+  const insp = await db.siteInspection.findUniqueOrThrow({ where: { id }, include: { job: true, type: true } });
   await db.siteInspection.update({ where: { id }, data: { status } });
   if (insp.job) {
-    await logActivity(`Inspection (${insp.typeId ? "" : ""}${insp.siteAddress}) marked ${status} on Job ${insp.job.jobNumber}`, { jobId: insp.jobId! });
+    const typeLabel = insp.type?.name ?? "Site inspection";
+    const message =
+      status === "Completed"
+        ? `${typeLabel} completed at ${insp.siteAddress || "site"}`
+        : `${typeLabel} at ${insp.siteAddress || "site"} marked ${status}`;
+    await logActivity(message, { jobId: insp.jobId! });
   }
   revalidateAll(insp.jobId);
 }

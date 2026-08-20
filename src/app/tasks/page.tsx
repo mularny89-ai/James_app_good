@@ -33,6 +33,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
 
   if (view === "myday") {
     where.inMyDay = true;
+    where.completed = false;
     heading = "My Day";
   } else if (view === "important") {
     where.important = true;
@@ -41,10 +42,15 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
   } else if (view === "planned") {
     heading = "Planned";
   } else if (view === "list" && listId) {
-    where.listId = listId;
     activeList = lists.find((l) => l.id === listId) ?? lists[0];
     heading = activeList.name;
-    if (activeList.name === "Completed") where.completed = true;
+    if (activeList.name === "Completed") {
+      // "Completed" is a virtual folder: every completed task lands here,
+      // regardless of which list it belongs to.
+      where.completed = true;
+    } else {
+      where.listId = listId;
+    }
   }
 
   if (filter === "overdue") {
@@ -64,6 +70,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
 
   if (clientId) where.clientId = clientId;
 
+  const isCompletedView = view === "list" && activeList.name === "Completed" && !filter;
   const raw = await db.task.findMany({
     where,
     include: {
@@ -72,7 +79,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
       list: true,
       subtasks: { select: { id: true, title: true, completed: true } },
     },
-    orderBy: [{ completed: "asc" }, { dueDate: "asc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
+    orderBy: isCompletedView
+      ? [{ completedAt: "desc" }]
+      : [{ completed: "asc" }, { dueDate: "asc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
     take: 500,
   });
 

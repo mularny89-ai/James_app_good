@@ -143,7 +143,17 @@ export default async function JobDetailPage({
                   {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
                 </select>
               </Field>
-              <Field label="Site Address" className="sm:col-span-2"><input name="siteAddress" defaultValue={job.siteAddress} className="input" /></Field>
+              <Field label="Street Address" className="sm:col-span-2"><input name="siteStreet" defaultValue={job.siteStreet || job.siteAddress} className="input" /></Field>
+              <Field label="Town / Suburb"><input name="siteSuburb" defaultValue={job.siteSuburb} className="input" /></Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="State">
+                  <select name="siteState" defaultValue={job.siteState} className="input">
+                    <option value="">—</option>
+                    {["QLD", "NSW", "VIC", "SA", "WA", "TAS", "NT", "ACT"].map((s) => <option key={s}>{s}</option>)}
+                  </select>
+                </Field>
+                <Field label="Postcode"><input name="sitePostcode" defaultValue={job.sitePostcode} className="input" /></Field>
+              </div>
               <Field label="Billing Address" className="sm:col-span-2"><input name="billingAddress" defaultValue={job.billingAddress} className="input" /></Field>
               <Field label="Assigned Engineer"><input name="assignedEngineer" defaultValue={job.assignedEngineer} className="input" /></Field>
               <Field label="Start Date"><input type="date" name="startDate" defaultValue={toInputDate(job.startDate)} className="input" /></Field>

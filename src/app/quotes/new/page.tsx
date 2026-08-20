@@ -37,7 +37,6 @@ export default async function NewQuotePage({ searchParams }: { searchParams: Rec
               />
             </Field>
             <Field label="Client Contact"><input name="contactName" className="input" placeholder="Defaults to client contact person" /></Field>
-            <Field label="Project"><input name="project" className="input" placeholder="e.g. Residential extension" /></Field>
             <Field label="Project Type">
               <select name="projectType" className="input" defaultValue="">
                 <option value="">—</option>

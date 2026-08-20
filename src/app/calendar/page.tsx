@@ -58,6 +58,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
       endTime: i.endTime,
       label: i.job ? String(i.job.jobNumber) : (i.type?.name ?? "Inspection"),
       sublabel: i.siteAddress,
+      title: i.type?.name ?? "Site Inspection",
+      jobNumber: i.job?.jobNumber ?? null,
+      address: i.siteAddress,
       href: `/inspections/${i.id}`,
       color: inspectionStatusColor(i.status),
     })),
@@ -69,6 +72,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
       endTime: "",
       label: t.title,
       sublabel: t.job ? `Job ${t.job.jobNumber}` : "Task",
+      title: "Task",
+      jobNumber: t.job?.jobNumber ?? null,
+      address: t.title,
       href: "/tasks?filter=today",
       color: "#b45309",
     })),
@@ -80,6 +86,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
       endTime: "",
       label: `Job ${j.jobNumber} due`,
       sublabel: j.name,
+      title: "Job Due",
+      jobNumber: j.jobNumber,
+      address: j.siteAddress || j.name,
       href: `/jobs/${j.id}`,
       color: "#64748b",
     })),
@@ -90,8 +99,13 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
       <PageHeader
         title="Calendar"
         subtitle="Site inspections, task due dates and job deadlines"
-        actions={<Link href="/inspections/new" className="btn-primary">+ Schedule Inspection</Link>}
+        actions={<Link href="/inspections/new?from=calendar" className="btn-primary">+ Schedule Inspection</Link>}
       />
+      {searchParams.scheduled === "1" && (
+        <div className="mb-3 rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--success)", color: "var(--success)", backgroundColor: "#f0fdf4" }}>
+          Site inspection scheduled successfully.
+        </div>
+      )}
       <CalendarView view={view} anchor={toISO(anchor)} events={events} />
     </div>
   );

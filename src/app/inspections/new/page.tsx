@@ -33,9 +33,16 @@ export default async function NewInspectionPage({ searchParams }: { searchParams
     <div className="mx-auto max-w-3xl p-5">
       <PageHeader
         title="Schedule Site Inspection"
-        subtitle={defaultJobId ? "Job details have been pre-populated." : "Select a job to auto-fill client, address and contact details."}
+        subtitle={defaultJobId ? "Job details have been pre-populated." : "Select a job to auto-fill client, address and contact details — or choose “No Job” to enter an address manually."}
       />
-      <InspectionForm action={createInspection} jobs={jobOpts} types={types} defaultJobId={defaultJobId} submitLabel="Schedule Inspection" />
+      <InspectionForm
+        action={createInspection}
+        jobs={jobOpts}
+        types={types}
+        defaultJobId={defaultJobId}
+        returnTo={searchParams.from === "calendar" ? "calendar" : undefined}
+        submitLabel="Schedule Inspection"
+      />
     </div>
   );
 }

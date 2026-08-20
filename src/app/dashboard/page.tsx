@@ -76,9 +76,9 @@ export default async function DashboardPage() {
         <Card href="/jobs?awaiting=1" label="Awaiting Information" count={jobsAwaitingInfo} tone="#b45309" />
         <Card href="/calendar" label="Inspections This Week" count={inspectionsThisWeek} tone="#0e7cc4" />
         <Card href="/tasks?filter=overdue" label="Overdue Tasks" count={overdueTasks} tone="#b91c1c" />
-        <Card href="/quotes?status=Sent" label="Quotes Awaiting Response" count={quotesAwaiting} tone="#b45309" />
-        <Card href="/invoices?status=Draft" label="Draft Invoices" count={draftInvoices} tone="#64748b" />
-        <Card href="/invoices?status=outstanding" label="Outstanding Invoices" count={outstandingInvoices} tone="#b91c1c" />
+        <Card href="/finances/quotes?status=Sent" label="Quotes Awaiting Response" count={quotesAwaiting} tone="#b45309" />
+        <Card href="/finances/invoices?status=Draft" label="Draft Invoices" count={draftInvoices} tone="#64748b" />
+        <Card href="/finances/invoices?status=outstanding" label="Outstanding Invoices" count={outstandingInvoices} tone="#b91c1c" />
         <div className="card px-3 py-2.5" style={{ borderLeft: "3px solid var(--error)" }}>
           <div className="text-2xl font-bold leading-none" style={{ color: "var(--error)" }}>{fmtMoney(outstandingTotal)}</div>
           <div className="mt-1 text-xs font-medium uppercase tracking-wide text-ink-muted">Total Outstanding</div>

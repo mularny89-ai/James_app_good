@@ -3,12 +3,33 @@
 import { db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { nextNumber, formatJobNumber } from "@/lib/numbering";
-import { parseInputDate } from "@/lib/format";
+import { parseInputDate, fmtAddress, splitAddress } from "@/lib/format";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 const num = (fd: FormData, k: string) => parseFloat(str(fd, k)) || 0;
+
+/** Structured site address from form fields, plus the formatted display string. */
+function siteFields(fd: FormData) {
+  const street = str(fd, "siteStreet");
+  const suburb = str(fd, "siteSuburb");
+  const state = str(fd, "siteState");
+  const postcode = str(fd, "sitePostcode");
+  // Legacy single-field fallback so older forms keep working.
+  const legacy = str(fd, "siteAddress");
+  const parts = street || suburb ? { street, suburb } : splitAddress(legacy);
+  const site = {
+    siteStreet: parts.street,
+    siteSuburb: parts.suburb,
+    siteState: state,
+    sitePostcode: postcode,
+  };
+  return {
+    ...site,
+    siteAddress: fmtAddress({ street: site.siteStreet, suburb: site.siteSuburb, state, postcode }),
+  };
+}
 
 async function statusIdByName(name: string): Promise<number> {
   const s = await db.jobStatus.findUnique({ where: { name } });
@@ -18,9 +39,12 @@ async function statusIdByName(name: string): Promise<number> {
 
 export async function createJob(fd: FormData) {
   const clientId = parseInt(str(fd, "clientId"));
-  if (!clientId) throw new Error("Select a client.");
-  const client = await db.client.findUniqueOrThrow({ where: { id: clientId } });
-  const name = str(fd, "name") || str(fd, "siteAddress") || "Untitled Job";
+  // Never crash the page on a missing client — bounce back with a message.
+  if (!clientId) redirect("/jobs/new?error=client");
+  const client = await db.client.findUnique({ where: { id: clientId } });
+  if (!client) redirect("/jobs/new?error=client");
+  const site = siteFields(fd);
+  const name = str(fd, "name") || site.siteAddress || "Untitled Job";
 
   const job = await db.$transaction(async (tx) => {
     const { seq, year } = await nextNumber(tx, "job");
@@ -33,7 +57,7 @@ export async function createJob(fd: FormData) {
         name,
         clientId,
         clientContact: str(fd, "clientContact") || client.contactPerson,
-        siteAddress: str(fd, "siteAddress"),
+        ...site,
         billingAddress: str(fd, "billingAddress") || client.billingAddress,
         description: str(fd, "description"),
         scope: str(fd, "scope"),
@@ -63,7 +87,7 @@ export async function updateJob(id: number, fd: FormData) {
     data: {
       name: str(fd, "name"),
       clientContact: str(fd, "clientContact"),
-      siteAddress: str(fd, "siteAddress"),
+      ...siteFields(fd),
       billingAddress: str(fd, "billingAddress"),
       description: str(fd, "description"),
       scope: str(fd, "scope"),

@@ -7,7 +7,7 @@ import { PRIORITIES } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewJobPage() {
+export default async function NewJobPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const [clients, types, nextNo] = await Promise.all([
     db.client.findMany({ where: { archived: false }, orderBy: { name: "asc" } }),
     db.jobType.findMany({ orderBy: { order: "asc" } }),
@@ -17,6 +17,12 @@ export default async function NewJobPage() {
   return (
     <div className="mx-auto max-w-3xl p-5">
       <PageHeader title="New Job" subtitle={`Job number will be assigned automatically (next: ${nextNo})`} />
+
+      {searchParams.error === "client" && (
+        <div className="mb-4 rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--error)", color: "var(--error)", backgroundColor: "#fef2f2" }}>
+          Please select a client from the list before creating the job.
+        </div>
+      )}
 
       {clients.length === 0 ? (
         <div className="card p-4 text-sm">
@@ -45,9 +51,23 @@ export default async function NewJobPage() {
                 {types.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
               </select>
             </Field>
-            <Field label="Site Address" className="sm:col-span-2">
-              <input name="siteAddress" className="input" placeholder="Street, Suburb" />
+            <Field label="Street Address" className="sm:col-span-2">
+              <input name="siteStreet" className="input" placeholder="e.g. 14 Example Street" />
             </Field>
+            <Field label="Town / Suburb">
+              <input name="siteSuburb" className="input" placeholder="e.g. Broadbeach" />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="State">
+                <select name="siteState" className="input" defaultValue="">
+                  <option value="">—</option>
+                  {["QLD", "NSW", "VIC", "SA", "WA", "TAS", "NT", "ACT"].map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </Field>
+              <Field label="Postcode">
+                <input name="sitePostcode" className="input" placeholder="4218" />
+              </Field>
+            </div>
             <Field label="Billing Address" className="sm:col-span-2">
               <input name="billingAddress" className="input" placeholder="Defaults to client billing address" />
             </Field>

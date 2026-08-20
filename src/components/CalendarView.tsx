@@ -12,9 +12,21 @@ export type CalEvent = {
   endTime: string;
   label: string;
   sublabel: string;
+  title?: string;      // event type, e.g. "Site Inspection"
+  jobNumber?: number | null;
+  address?: string;
   href: string;
   color: string;
 };
+
+/** "09:30" -> "9:30 AM" (kept local so the client bundle stays self-contained). */
+function fmtTime12(t: string): string {
+  if (!t) return "";
+  const [hs, ms] = t.split(":");
+  const h = parseInt(hs);
+  if (isNaN(h)) return t;
+  return `${h % 12 === 0 ? 12 : h % 12}:${(ms ?? "00").padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
 
 const toISO = (d: Date) => {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -25,20 +37,35 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function EventChip({ ev, compact }: { ev: CalEvent; compact?: boolean }) {
   const router = useRouter();
+  if (compact) {
+    return (
+      <button
+        draggable={ev.kind === "inspection"}
+        onDragStart={(e) => e.dataTransfer.setData("text/event", JSON.stringify({ id: ev.id, kind: ev.kind }))}
+        onClick={() => router.push(ev.href)}
+        className="cal-event"
+        style={{ backgroundColor: ev.color, cursor: ev.kind === "inspection" ? "grab" : "pointer" }}
+        title={`${ev.startTime} ${ev.label} — ${ev.sublabel}`}
+      >
+        {ev.startTime} {ev.label}
+      </button>
+    );
+  }
+  // Day/week blocks: event type, time, job number, address — in that priority.
+  const timeLabel = fmtTime12(ev.startTime) + (ev.endTime ? `–${fmtTime12(ev.endTime)}` : "");
   return (
     <button
       draggable={ev.kind === "inspection"}
       onDragStart={(e) => e.dataTransfer.setData("text/event", JSON.stringify({ id: ev.id, kind: ev.kind }))}
       onClick={() => router.push(ev.href)}
       className="cal-event"
-      style={{ backgroundColor: ev.color, cursor: ev.kind === "inspection" ? "grab" : "pointer" }}
-      title={`${ev.startTime} ${ev.label} — ${ev.sublabel}`}
+      style={{ backgroundColor: ev.color, cursor: ev.kind === "inspection" ? "grab" : "pointer", whiteSpace: "normal", overflow: "hidden" }}
+      title={`${timeLabel} ${ev.title ?? ev.label} — ${ev.sublabel}`}
     >
-      {compact ? `${ev.startTime} ${ev.label}` : (
-        <>
-          <strong>{ev.startTime}</strong> <strong>{ev.label}</strong> {ev.sublabel}
-        </>
-      )}
+      <span className="block truncate text-[11px] font-bold leading-tight">{ev.title ?? ev.label}</span>
+      {timeLabel && <span className="block truncate text-[10px] leading-tight">{timeLabel}</span>}
+      {ev.jobNumber != null && <span className="block truncate text-[10px] leading-tight">Job {ev.jobNumber}</span>}
+      {ev.address && <span className="block truncate text-[10px] leading-tight opacity-90">{ev.address}</span>}
     </button>
   );
 }

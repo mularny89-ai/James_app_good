@@ -10,8 +10,7 @@ const NAV = [
   { href: "/tasks", label: "Tasks", icon: "✓" },
   { href: "/calendar", label: "Calendar", icon: "◷" },
   { href: "/inspections", label: "Site Inspections", icon: "⌖" },
-  { href: "/quotes", label: "Quotes", icon: "❝" },
-  { href: "/invoices", label: "Invoices", icon: "$" },
+  { href: "/finances", label: "Finances", icon: "$", match: ["/finances", "/quotes", "/invoices"] },
   { href: "/clients", label: "Clients", icon: "♟" },
   { href: "/reports", label: "Reports", icon: "▥" },
   { href: "/settings", label: "Settings", icon: "⚙" },
@@ -55,7 +54,8 @@ export default function Sidebar({ companyName, logoPath }: { companyName: string
 
       <nav className="flex-1 overflow-y-auto py-2">
         {NAV.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          const bases = "match" in item && item.match ? item.match : [item.href];
+          const active = bases.some((b) => pathname === b || pathname.startsWith(b + "/"));
           return (
             <Link
               key={item.href}

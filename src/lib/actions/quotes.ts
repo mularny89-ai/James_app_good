@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { nextNumber, formatQuoteNumber, formatJobNumber } from "@/lib/numbering";
 import { getSettings } from "@/lib/settings";
-import { parseInputDate } from "@/lib/format";
+import { parseInputDate, splitAddress } from "@/lib/format";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -44,7 +44,7 @@ export async function createQuote(fd: FormData) {
         clientId,
         contactName: str(fd, "contactName") || client.contactPerson,
         siteAddress: str(fd, "siteAddress"),
-        project: str(fd, "project") || str(fd, "siteAddress"),
+        // Project removed from the entry workflow; column kept for historical data.
         projectType: str(fd, "projectType"),
         scope: str(fd, "scope"),
         exclusions: str(fd, "exclusions"),
@@ -169,6 +169,7 @@ export async function acceptQuoteAndCreateJob(id: number) {
       ? await tx.jobType.findUnique({ where: { name: quote.projectType } })
       : null;
 
+    const siteParts = splitAddress(quote.siteAddress);
     const job = await tx.job.create({
       data: {
         jobNumber,
@@ -176,6 +177,8 @@ export async function acceptQuoteAndCreateJob(id: number) {
         clientId: quote.clientId,
         clientContact: quote.contactName,
         siteAddress: quote.siteAddress,
+        siteStreet: siteParts.street,
+        siteSuburb: siteParts.suburb,
         billingAddress: quote.client.billingAddress,
         scope: quote.scope,
         projectTypeId: type?.id ?? null,

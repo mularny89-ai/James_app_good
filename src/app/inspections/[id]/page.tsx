@@ -10,7 +10,7 @@ import { inspectionStatusColor, INSPECTION_STATUSES } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
-export default async function InspectionDetailPage({ params }: { params: { id: string } }) {
+export default async function InspectionDetailPage({ params, searchParams }: { params: { id: string }; searchParams: Record<string, string | undefined> }) {
   const id = parseInt(params.id);
   const insp = await db.siteInspection.findUnique({ where: { id }, include: { job: true, type: true } });
   if (!insp) notFound();
@@ -58,6 +58,11 @@ export default async function InspectionDetailPage({ params }: { params: { id: s
           </>
         }
       />
+      {searchParams.created === "1" && (
+        <div className="mb-4 rounded-md border px-3 py-2 text-sm" style={{ borderColor: "var(--success)", color: "var(--success)", backgroundColor: "#f0fdf4" }}>
+          Site inspection scheduled successfully.
+        </div>
+      )}
       <InspectionForm
         action={updateBound}
         jobs={jobOpts}

@@ -1,9 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import SearchableSelect from "@/components/SearchableSelect";
 import { Field } from "@/components/ui";
 import { INSPECTION_STATUSES } from "@/lib/constants";
+
+function SubmitButton({ label }: { label: string }) {
+  // Disabled while the server action runs — prevents duplicate inspections.
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" className="btn-primary" disabled={pending}>
+      {pending ? "Saving…" : label}
+    </button>
+  );
+}
 
 type JobOpt = { id: number; jobNumber: number; name: string; clientName: string; siteAddress: string; clientContact: string; clientPhone: string; clientEmail: string };
 type InspType = { id: number; name: string };
@@ -32,6 +43,7 @@ export default function InspectionForm({
   types,
   inspection,
   defaultJobId,
+  returnTo,
   submitLabel = "Save Inspection",
 }: {
   action: (fd: FormData) => Promise<void>;
@@ -39,6 +51,7 @@ export default function InspectionForm({
   types: InspType[];
   inspection?: InspectionDTO;
   defaultJobId?: number;
+  returnTo?: string;
   submitLabel?: string;
 }) {
   const [selectedJob, setSelectedJob] = useState<JobOpt | null>(
@@ -49,18 +62,22 @@ export default function InspectionForm({
 
   return (
     <form action={action} className="card space-y-4 p-5">
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
       {/* key forces re-mount so inherited job data populates uncontrolled fields */}
       <div className="grid gap-4 sm:grid-cols-2" key={selectedJob?.id ?? "none"}>
-        <Field label="Job (optional — auto-fills details)">
+        <Field label="Job / Site">
           <SearchableSelect
             name="jobId"
             defaultValue={selectedJob ? String(selectedJob.id) : ""}
-            placeholder="Search job number or address…"
-            options={jobs.map((j) => ({
-              value: String(j.id),
-              label: `${j.jobNumber} — ${j.name}`,
-              hint: j.siteAddress,
-            }))}
+            placeholder="Search job number, address or client…"
+            options={[
+              { value: "", label: "No Job / Enter Address Manually" },
+              ...jobs.map((j) => ({
+                value: String(j.id),
+                label: j.siteAddress ? `${j.jobNumber} — ${j.siteAddress}` : `${j.jobNumber} — ${j.name}`,
+                hint: j.clientName,
+              })),
+            ]}
             onChange={(v) => setSelectedJob(jobs.find((j) => String(j.id) === v) ?? null)}
           />
         </Field>
@@ -107,7 +124,7 @@ export default function InspectionForm({
       </div>
       <div className="flex justify-end gap-2 border-t border-line pt-4">
         <a href="/inspections" className="btn">Cancel</a>
-        <button type="submit" className="btn-primary">{submitLabel}</button>
+        <SubmitButton label={submitLabel} />
       </div>
     </form>
   );

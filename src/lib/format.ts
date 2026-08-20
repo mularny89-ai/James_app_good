@@ -66,3 +66,46 @@ export function startOfWeek(d: Date): Date {
 export function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
+
+/** 12-hour time label, e.g. "09:30" -> "9:30 AM". */
+export function fmtTime(t?: string | null): string {
+  if (!t) return "";
+  const [hs, ms] = t.split(":");
+  const h = parseInt(hs);
+  if (isNaN(h)) return t;
+  const ampm = h < 12 ? "AM" : "PM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${(ms ?? "00").padStart(2, "0")} ${ampm}`;
+}
+
+export type AddressParts = {
+  street?: string | null;
+  suburb?: string | null;
+  state?: string | null;
+  postcode?: string | null;
+  country?: string | null;
+};
+
+/** Single reusable display formatter: "14 Example Street, Broadbeach QLD 4218". */
+export function fmtAddress(p: AddressParts): string {
+  const street = (p.street ?? "").trim();
+  const locality = [p.suburb, p.state, p.postcode]
+    .map((s) => (s ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+  const out = [street, locality].filter(Boolean).join(", ");
+  const country = (p.country ?? "").trim();
+  return country && country !== "Australia" ? (out ? `${out}, ${country}` : country) : out;
+}
+
+/**
+ * Best-effort split of a free-form address into structured parts.
+ * Splits on the last comma; anything unparsable stays in street so nothing is lost.
+ */
+export function splitAddress(full: string): { street: string; suburb: string } {
+  const v = (full ?? "").trim();
+  if (!v) return { street: "", suburb: "" };
+  const i = v.lastIndexOf(",");
+  if (i === -1) return { street: v, suburb: "" };
+  return { street: v.slice(0, i).trim(), suburb: v.slice(i + 1).trim() };
+}

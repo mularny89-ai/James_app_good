@@ -145,7 +145,13 @@ model Job {
   clientId       Int
   client         Client           @relation(fields: [clientId], references: [id])
   clientContact  String           @default("")
+  // Structured site address; siteAddress stays as the formatted display string
   siteAddress    String           @default("")
+  siteStreet     String           @default("")
+  siteSuburb     String           @default("")
+  siteState      String           @default("")
+  sitePostcode   String           @default("")
+  siteCountry    String           @default("Australia")
   billingAddress String           @default("")
   description    String           @default("")
   scope          String           @default("")
