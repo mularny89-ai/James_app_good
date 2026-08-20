@@ -56,6 +56,16 @@ Visual workload scheduler/Gantt for Jobs at `/planner`:
 - **`src/components/PlannerBoard.tsx`** (client): rows-per-job Gantt with drag bar to reschedule (`moveJobToDate`), drag edges to resize (`resizeJobDuration`), drag row/label to reorder, drop unscheduled cards onto timeline, job popover (Change Dates, palette + custom colour, engineer, priority, Move Up/Down, Unschedule, Open Job), Schedule Job modal (SearchableSelect), unscheduled side panel (`?panel=unscheduled`), client-side Sort By (visual only — never touches manual order) + "View By Engineer" grouping. Bars: colour from DB, completed muted, overdue hatched, ◂▸ clip arrows, inspection diamonds, task ⚑ badge.
 - **Elsewhere**: Sidebar "Job Planner" entry; job detail Overview has a Planning card (colour/start/end/duration/planning status + View in Planner); New Job form has optional Planned Start/Duration/Unit; dashboard has 4 planner cards.
 
+## Second update round (commit 3fb12ba, engineering-app)
+
+- **Employees**: `Employee` model (name/role/email/phone/active); Settings → Employees tab (`EmployeeManager`); searchable assignee picker on job new/edit forms storing `employeeId` (legacy `assignedEngineer` string kept for compat).
+- **Invoice presets**: `InvoicePreset` model (name/description/unitPrice/defaultQty/gstApplicable/active); Settings → Invoice Presets (`PresetManager`); `LineItemsEditor` preset dropdown auto-fills rows; `presetOpts()` helper in `src/lib/presets.ts`.
+- **Numbering**: `Job.jobNumber`/`Quote.quoteNumber` are Strings now; Settings → Numbering (`NumberingForm`) edits prefix/digits/next with live preview (defaults J66/Q66); `consumeSequence`/`allocateJobNumber`/`allocateQuoteNumber` in `src/lib/numbering.ts` use `NumberSequence` rows (key, year) in atomic transactions. Existing numbers never touched by settings changes.
+- **ClientSelect** (`src/components/ClientSelect.tsx`): shared search picker with inline "+ Add New Client" modal (pinned `noFilter` option in SearchableSelect); used in jobs/new, quotes/new, quotes/[id]; job edit keeps client fixed. `key={value-selKey}` remount keeps freshly-created client selected.
+- **Planner**: weekends hatched, engineer filter also reads `assignedEmployee`, labels = job № + full street/suburb. **Calendar**: chips use planner colours, show job №.
+- **Testing**: `npm test` → `node tests/run.cjs` (27 assertions, baseline-based so it runs against live data; covers numbering idempotency, existing-number preservation, transaction rollback).
+- Gotcha: native `<input type=date>` can't be filled by browser tooling's `browser_type`; verify planner scheduling via planner modal or DB.
+
 ## User Preferences (from update request)
 
 - Numbered fix lists — implement in place, do NOT rebuild or duplicate pages; preserve existing structure.
