@@ -24,10 +24,11 @@ model CompanySettings {
   secondaryColor   String  @default("#23255F")
   gstRate          Float   @default(10)
   currency         String  @default("AUD")
-  // Numbering
-  jobNumberFormat  String  @default("YY###") // YY = year, ### = sequence
-  quotePrefix      String  @default("Q-")
-  quoteFormat      String  @default("YY###")
+  // Numbering — prefix + fixed-width digits, counters kept in NumberSequence
+  jobPrefix        String  @default("J66")
+  jobDigits        Int     @default(3)
+  quotePrefix      String  @default("Q66")
+  quoteDigits      Int     @default(3)
   invoicePrefix    String  @default("INV-")
   invoiceFormat    String  @default("YY####")
   // Preferences
@@ -42,6 +43,22 @@ model NumberSequence {
   year      Int
   nextValue Int @default(1)
   @@unique([key, year])
+}
+
+model Employee {
+  id           Int     @id @default(autoincrement())
+  firstName    String
+  lastName     String  @default("")
+  displayName  String
+  position     String  @default("")
+  email        String  @default("")
+  phone        String  @default("")
+  notes        String  @default("")
+  active       Boolean @default(true)
+  assignable   Boolean @default(true) // can be assigned to jobs
+  order        Int     @default(0)
+  createdAt    DateTime @default(now())
+  jobs         Job[]
 }
 
 model JobStatus {
@@ -140,7 +157,7 @@ model QuoteItem {
 
 model Job {
   id             Int              @id @default(autoincrement())
-  jobNumber      Int              @unique
+  jobNumber      String           @unique
   name           String
   clientId       Int
   client         Client           @relation(fields: [clientId], references: [id])
@@ -160,7 +177,9 @@ model Job {
   statusId       Int
   status         JobStatus        @relation(fields: [statusId], references: [id])
   priority       String           @default("Normal") // Low | Normal | High | Urgent
-  assignedEngineer String         @default("")
+  assignedEngineer String         @default("") // denormalised display name
+  assignedEmployeeId Int?
+  assignedEmployee   Employee?    @relation(fields: [assignedEmployeeId], references: [id])
   startDate      DateTime?
   dueDate        DateTime?
   completedAt    DateTime?
@@ -277,6 +296,18 @@ model InvoiceItem {
   unitPrice   Float   @default(0)
   amount      Float   @default(0)
   order       Int     @default(0)
+}
+
+// Reusable line-item presets for quotes/invoices (site inspections, design, ...)
+model InvoicePreset {
+  id           Int     @id @default(autoincrement())
+  name         String
+  description  String  @default("")
+  unitPrice    Float   @default(0)
+  gstApplicable Boolean @default(true)
+  defaultQty   Float   @default(1)
+  active       Boolean @default(true)
+  order        Int     @default(0)
 }
 
 model Payment {

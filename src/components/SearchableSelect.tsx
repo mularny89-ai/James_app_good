@@ -12,7 +12,7 @@ export default function SearchableSelect({
   onChange,
 }: {
   name: string;
-  options: { value: string; label: string; hint?: string }[];
+  options: { value: string; label: string; hint?: string; noFilter?: boolean }[];
   defaultValue?: string;
   placeholder?: string;
   required?: boolean;
@@ -37,9 +37,11 @@ export default function SearchableSelect({
   });
 
   const filtered = useMemo(() => {
+    if (!text) return options.slice(0, 50);
     const q = text.toLowerCase();
-    if (!q) return options.slice(0, 50);
-    return options.filter((o) => (o.label + " " + (o.hint ?? "")).toLowerCase().includes(q)).slice(0, 50);
+    const pinned = options.filter((o) => o.noFilter);
+    const hits = options.filter((o) => !o.noFilter && (o.label + " " + (o.hint ?? "")).toLowerCase().includes(q));
+    return [...hits.slice(0, 50), ...pinned];
   }, [text, options]);
 
   const select = (o: { value: string; label: string }) => {

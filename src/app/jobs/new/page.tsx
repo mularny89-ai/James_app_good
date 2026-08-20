@@ -3,15 +3,17 @@ import { createJob } from "@/lib/actions/jobs";
 import { peekNextJobNumber } from "@/lib/numbering";
 import { PageHeader, Field } from "@/components/ui";
 import SearchableSelect from "@/components/SearchableSelect";
+import ClientSelect from "@/components/ClientSelect";
 import { PRIORITIES } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewJobPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
-  const [clients, types, nextNo] = await Promise.all([
+  const [clients, types, nextNo, employees] = await Promise.all([
     db.client.findMany({ where: { archived: false }, orderBy: { name: "asc" } }),
     db.jobType.findMany({ orderBy: { order: "asc" } }),
     peekNextJobNumber(),
+    db.employee.findMany({ where: { active: true, assignable: true }, orderBy: { displayName: "asc" } }),
   ]);
 
   return (
@@ -33,7 +35,7 @@ export default async function NewJobPage({ searchParams }: { searchParams: Recor
         <form action={createJob} className="card space-y-4 p-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Client *">
-              <SearchableSelect
+              <ClientSelect
                 name="clientId"
                 required
                 options={clients.map((c) => ({ value: String(c.id), label: c.name, hint: c.company }))}
@@ -77,7 +79,11 @@ export default async function NewJobPage({ searchParams }: { searchParams: Recor
               </select>
             </Field>
             <Field label="Assigned Engineer">
-              <input name="assignedEngineer" className="input" />
+              <SearchableSelect
+                name="assignedEmployeeId"
+                options={employees.map((e) => ({ value: String(e.id), label: e.displayName, hint: e.position }))}
+                placeholder="Search employees…"
+              />
             </Field>
             <Field label="Start Date">
               <input type="date" name="startDate" className="input" />

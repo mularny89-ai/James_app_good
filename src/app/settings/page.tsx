@@ -1,7 +1,9 @@
 import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
-import { saveCompanySettings, saveNumberingSettings, saveFinancialSettings, savePreferences } from "@/lib/actions/settings";
-import { peekNextJobNumber, peekNextQuoteNumber } from "@/lib/numbering";
+import { saveCompanySettings, saveFinancialSettings, savePreferences } from "@/lib/actions/settings";
+import EmployeeManager from "@/components/EmployeeManager";
+import PresetManager from "@/components/PresetManager";
+import NumberingForm from "@/components/NumberingForm";
 import { PageHeader, Field } from "@/components/ui";
 import BrandingForm from "@/components/BrandingForm";
 import ConfigListEditor from "@/components/ConfigListEditor";
@@ -13,24 +15,33 @@ const TABS = [
   { key: "company", label: "Company" },
   { key: "branding", label: "Branding" },
   { key: "numbering", label: "Numbering" },
+  { key: "employees", label: "Employees" },
   { key: "statuses", label: "Job Statuses" },
   { key: "types", label: "Job Types" },
   { key: "lists", label: "Task Lists" },
   { key: "inspections", label: "Inspection Types" },
+  { key: "presets", label: "Invoice Presets" },
   { key: "financial", label: "Financial" },
   { key: "preferences", label: "Preferences" },
 ];
 
+const nextOf = async (key: "job" | "quote"): Promise<number> => {
+  const row = await db.numberSequence.findUnique({ where: { key_year: { key, year: 0 } } });
+  return row?.nextValue ?? 1;
+};
+
 export default async function SettingsPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const tab = searchParams.tab ?? "company";
-  const [settings, statuses, types, lists, inspTypes, nextJob, nextQuote] = await Promise.all([
+  const [settings, statuses, types, lists, inspTypes, employees, presets, jobNext, quoteNext] = await Promise.all([
     getSettings(),
     db.jobStatus.findMany({ orderBy: { order: "asc" } }),
     db.jobType.findMany({ orderBy: { order: "asc" } }),
     db.taskList.findMany({ orderBy: { order: "asc" } }),
     db.inspectionType.findMany({ orderBy: { order: "asc" } }),
-    peekNextJobNumber(),
-    peekNextQuoteNumber(),
+    db.employee.findMany({ orderBy: [{ order: "asc" }, { displayName: "asc" }] }),
+    db.invoicePreset.findMany({ orderBy: { order: "asc" } }),
+    nextOf("job"),
+    nextOf("quote"),
   ]);
 
   return (
@@ -73,34 +84,21 @@ export default async function SettingsPage({ searchParams }: { searchParams: Rec
         )}
 
         {tab === "numbering" && (
-          <form action={saveNumberingSettings} className="card space-y-4 p-5">
-            <p className="text-sm text-ink-muted">
-              Formats use <code>YY</code> for the two-digit year and <code>#</code> for the sequence digits.
-              Job and quote sequences are independent — quotes never consume job numbers.
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={`Job Number Format (next: ${nextJob})`}>
-                <input name="jobNumberFormat" className="input" defaultValue={settings.jobNumberFormat} />
-              </Field>
-              <div />
-              <Field label={`Quote Prefix (next: ${nextQuote})`}>
-                <input name="quotePrefix" className="input" defaultValue={settings.quotePrefix} />
-              </Field>
-              <Field label="Quote Format">
-                <input name="quoteFormat" className="input" defaultValue={settings.quoteFormat} />
-              </Field>
-              <Field label="Invoice Prefix">
-                <input name="invoicePrefix" className="input" defaultValue={settings.invoicePrefix} />
-              </Field>
-              <Field label="Invoice Format">
-                <input name="invoiceFormat" className="input" defaultValue={settings.invoiceFormat} />
-              </Field>
-            </div>
-            <div className="flex justify-end border-t border-line pt-4">
-              <button type="submit" className="btn-primary">Save Numbering</button>
-            </div>
-          </form>
+          <NumberingForm
+            jobPrefix={settings.jobPrefix}
+            jobDigits={settings.jobDigits}
+            jobNext={jobNext}
+            quotePrefix={settings.quotePrefix}
+            quoteDigits={settings.quoteDigits}
+            quoteNext={quoteNext}
+            invoicePrefix={settings.invoicePrefix}
+            invoiceFormat={settings.invoiceFormat}
+          />
         )}
+
+        {tab === "employees" && <EmployeeManager employees={employees} />}
+
+        {tab === "presets" && <PresetManager presets={presets} />}
 
         {tab === "statuses" && (
           <div className="card p-5">

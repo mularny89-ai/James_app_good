@@ -5,6 +5,7 @@ import { fmtDate, fmtDateTime, fmtMoney, toInputDate } from "@/lib/format";
 import { updateJob, moveJobById, addDocument, deleteDocument } from "@/lib/actions/jobs";
 import { createTask } from "@/lib/actions/tasks";
 import { PageHeader, SoftBadge, EmptyState, Field, StatRow, Badge } from "@/components/ui";
+import SearchableSelect from "@/components/SearchableSelect";
 import MoveTo from "@/components/MoveTo";
 import ConfirmButton from "@/components/ConfirmButton";
 import JobProgress from "@/components/JobProgress";
@@ -34,6 +35,7 @@ export default async function JobDetailPage({
       client: true,
       status: true,
       projectType: true,
+      assignedEmployee: true,
       quote: { include: { items: true } },
       tasks: { orderBy: [{ completed: "asc" }, { dueDate: "asc" }] },
       inspections: { include: { type: true }, orderBy: { date: "desc" } },
@@ -45,10 +47,11 @@ export default async function JobDetailPage({
   });
   if (!job) notFound();
 
-  const [statuses, types, taskLists] = await Promise.all([
+  const [statuses, types, taskLists, employees] = await Promise.all([
     db.jobStatus.findMany({ orderBy: { order: "asc" } }),
     db.jobType.findMany({ orderBy: { order: "asc" } }),
     db.taskList.findMany({ orderBy: { order: "asc" } }),
+    db.employee.findMany({ where: { active: true, assignable: true }, orderBy: { displayName: "asc" } }),
   ]);
 
   // Financial summary derived from linked records (Section 59)
@@ -156,7 +159,19 @@ export default async function JobDetailPage({
                 <Field label="Postcode"><input name="sitePostcode" defaultValue={job.sitePostcode} className="input" /></Field>
               </div>
               <Field label="Billing Address" className="sm:col-span-2"><input name="billingAddress" defaultValue={job.billingAddress} className="input" /></Field>
-              <Field label="Assigned Engineer"><input name="assignedEngineer" defaultValue={job.assignedEngineer} className="input" /></Field>
+              <Field label="Assigned Engineer">
+                <SearchableSelect
+                  name="assignedEmployeeId"
+                  defaultValue={job.assignedEmployeeId ? String(job.assignedEmployeeId) : ""}
+                  placeholder="Search employees…"
+                  options={[
+                    ...(job.assignedEmployee && !job.assignedEmployee.active
+                      ? [{ value: String(job.assignedEmployee.id), label: job.assignedEmployee.displayName, hint: "Inactive" }]
+                      : []),
+                    ...employees.map((e) => ({ value: String(e.id), label: e.displayName, hint: e.position })),
+                  ]}
+                />
+              </Field>
               <Field label="Start Date"><input type="date" name="startDate" defaultValue={toInputDate(job.startDate)} className="input" /></Field>
               <Field label="Due Date"><input type="date" name="dueDate" defaultValue={toInputDate(job.dueDate)} className="input" /></Field>
               <Field label="Quoted Fee (ex GST)"><input type="number" step="0.01" name="quotedFee" defaultValue={job.quotedFee} className="input" /></Field>

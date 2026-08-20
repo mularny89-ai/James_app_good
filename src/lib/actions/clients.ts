@@ -7,6 +7,33 @@ import { redirect } from "next/navigation";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
+export async function createClientInline(data: {
+  name: string;
+  company?: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  billingAddress?: string;
+}): Promise<{ id: number; name: string; company: string }> {
+  // Inline creation from Job/Quote forms — saves centrally and returns the
+  // id so the caller selects the new client without a refresh (Sections 30/31).
+  const name = (data.name ?? "").trim();
+  if (!name) throw new Error("Client name is required.");
+  const client = await db.client.create({
+    data: {
+      name,
+      company: data.company ?? "",
+      contactPerson: data.contactPerson ?? "",
+      email: data.email ?? "",
+      phone: data.phone ?? "",
+      billingAddress: data.billingAddress ?? "",
+    },
+  });
+  await logActivity(`Client ${name} created`, { clientId: client.id });
+  revalidatePath("/clients");
+  return { id: client.id, name: client.name, company: client.company };
+}
+
 export async function createClient(fd: FormData) {
   const name = str(fd, "name");
   if (!name) throw new Error("Client name is required.");

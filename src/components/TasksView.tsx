@@ -16,7 +16,7 @@ export type TaskDTO = {
   title: string;
   description: string;
   jobId: number | null;
-  jobNumber: number | null;
+  jobNumber: string | null;
   clientName: string | null;
   listId: number;
   listName: string;
@@ -35,7 +35,7 @@ export type TaskDTO = {
 };
 
 type ListOpt = { id: number; name: string };
-type JobOpt = { id: number; jobNumber: number; name: string };
+type JobOpt = { id: number; jobNumber: string; name: string };
 
 function Group({ title, tone, children }: { title: string; tone?: string; children: React.ReactNode }) {
   return (

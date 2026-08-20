@@ -11,6 +11,14 @@ import { redirect } from "next/navigation";
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 const num = (fd: FormData, k: string) => parseFloat(str(fd, k)) || 0;
 
+/** Resolve the Assigned Engineer from an Employee id (relationship by id, not text). */
+async function employeeOf(fd: FormData): Promise<{ assignedEmployeeId: number | null; assignedEngineer: string }> {
+  const id = parseInt(String(fd.get("assignedEmployeeId") ?? ""));
+  if (!id) return { assignedEmployeeId: null, assignedEngineer: "" };
+  const e = await db.employee.findUnique({ where: { id } });
+  return { assignedEmployeeId: id, assignedEngineer: e?.displayName ?? "" };
+}
+
 /** Structured site address from form fields, plus the formatted display string. */
 function siteFields(fd: FormData) {
   const street = str(fd, "siteStreet");
@@ -45,6 +53,7 @@ export async function createJob(fd: FormData) {
   const client = await db.client.findUnique({ where: { id: clientId } });
   if (!client) redirect("/jobs/new?error=client");
   const site = siteFields(fd);
+  const emp = await employeeOf(fd);
   const name = str(fd, "name") || site.siteAddress || "Untitled Job";
 
   // Optional planner scheduling picked up from the new-job form (Section 43)
@@ -53,8 +62,8 @@ export async function createJob(fd: FormData) {
   const durationUnit = str(fd, "durationUnit") === "calendar" ? "calendar" : "working";
 
   const job = await db.$transaction(async (tx) => {
-    const { seq, year } = await nextNumber(tx, "job");
-    const jobNumber = await formatJobNumber(seq, year);
+    const { seq } = await nextNumber(tx, "job");
+    const jobNumber = await formatJobNumber(seq);
     const typeName = str(fd, "projectType");
     const type = typeName ? await tx.jobType.findUnique({ where: { name: typeName } }) : null;
     return tx.job.create({
@@ -70,7 +79,8 @@ export async function createJob(fd: FormData) {
         projectTypeId: type?.id ?? null,
         statusId: await statusIdByName("To Start"),
         priority: str(fd, "priority") || "Normal",
-        assignedEngineer: str(fd, "assignedEngineer"),
+        assignedEmployeeId: emp.assignedEmployeeId,
+        assignedEngineer: emp.assignedEngineer,
         startDate: parseInputDate(str(fd, "startDate")),
         dueDate: parseInputDate(str(fd, "dueDate")),
         quotedFee: num(fd, "quotedFee"),
@@ -92,6 +102,7 @@ export async function updateJob(id: number, fd: FormData) {
   const type = typeName ? await db.jobType.findUnique({ where: { name: typeName } }) : null;
   const statusName = str(fd, "status");
   const statusId = statusName ? await statusIdByName(statusName) : undefined;
+  const emp = await employeeOf(fd);
   const job = await db.job.update({
     where: { id },
     data: {
@@ -104,7 +115,8 @@ export async function updateJob(id: number, fd: FormData) {
       projectTypeId: type?.id ?? null,
       ...(statusId ? { statusId } : {}),
       priority: str(fd, "priority") || "Normal",
-      assignedEngineer: str(fd, "assignedEngineer"),
+      assignedEmployeeId: emp.assignedEmployeeId,
+      assignedEngineer: emp.assignedEngineer,
       startDate: parseInputDate(str(fd, "startDate")),
       dueDate: parseInputDate(str(fd, "dueDate")),
       quotedFee: num(fd, "quotedFee"),

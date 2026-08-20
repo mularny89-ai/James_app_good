@@ -9,6 +9,7 @@ import BrandDocument from "@/components/BrandDocument";
 import ConfirmButton from "@/components/ConfirmButton";
 import PrintButton from "@/components/PrintButton";
 import InvoiceForm from "@/components/InvoiceForm";
+import { presetOpts } from "@/lib/presets";
 import { invoiceStatusColor } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export default async function InvoiceDetailPage({
   const id = parseInt(params.id);
   const mode = searchParams.mode ?? "preview";
 
-  const [invoice, settings, jobs] = await Promise.all([
+  const [invoice, settings, jobs, presets] = await Promise.all([
     db.invoice.findUnique({
       where: { id },
       include: {
@@ -40,6 +41,7 @@ export default async function InvoiceDetailPage({
       orderBy: { jobNumber: "desc" },
       take: 500,
     }),
+    presetOpts(),
   ]);
   if (!invoice) notFound();
 
@@ -103,7 +105,7 @@ export default async function InvoiceDetailPage({
           <InvoiceForm
             action={updateBound}
             jobs={jobOpts}
-            gstRate={settings.gstRate}
+            gstRate={settings.gstRate} presets={presets}
             submitLabel="Save Changes"
             invoice={{
               jobId: invoice.jobId,

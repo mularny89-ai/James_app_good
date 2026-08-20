@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import SearchableSelect from "@/components/SearchableSelect";
 
 export type LineItemRow = { description: string; qty: number; unitPrice: number };
+export type PresetOpt = { value: string; label: string; hint?: string; description: string; qty: number; unitPrice: number };
 
-/** Quote/invoice line items with live GST calculation (Sections 49, 82). */
+/** Quote/invoice line items with live GST calculation (Sections 49, 82).
+ *  Optionally offers preset line items via a searchable dropdown (Sections 43–46). */
 export default function LineItemsEditor({
   items: initial,
   gstRate,
+  presets = [],
 }: {
   items: LineItemRow[];
   gstRate: number;
+  presets?: PresetOpt[];
 }) {
   const [rows, setRows] = useState<LineItemRow[]>(
     initial.length > 0 ? initial : [{ description: "", qty: 1, unitPrice: 0 }]
@@ -19,12 +24,35 @@ export default function LineItemsEditor({
   const set = (i: number, patch: Partial<LineItemRow>) =>
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
+  const applyPreset = (v: string) => {
+    const p = presets.find((x) => x.value === v);
+    if (!p) return;
+    const fill = { description: p.description || p.label, qty: p.qty, unitPrice: p.unitPrice };
+    setRows((rs) => {
+      const empty = rs.findIndex((r) => !r.description && !r.unitPrice);
+      if (empty >= 0) return rs.map((r, j) => (j === empty ? fill : r));
+      return [...rs, fill];
+    });
+  };
+
   const subtotal = rows.reduce((s, r) => s + r.qty * r.unitPrice, 0);
   const gst = subtotal * (gstRate / 100);
   const money = (n: number) => `$${n.toFixed(2)}`;
 
   return (
     <div>
+      {presets.length > 0 && (
+        <div className="mb-2 max-w-md">
+          {/* key remounts the widget so it resets after each pick */}
+          <SearchableSelect
+            key={rows.length + "-preset"}
+            name=""
+            placeholder="Service / Description preset…"
+            options={presets}
+            onChange={applyPreset}
+          />
+        </div>
+      )}
       <table className="w-full">
         <thead>
           <tr className="border-b border-line">

@@ -36,8 +36,8 @@ export async function createQuote(fd: FormData) {
   const t = totals(items, settings.gstRate);
 
   const quote = await db.$transaction(async (tx) => {
-    const { seq, year } = await nextNumber(tx, "quote");
-    const quoteNumber = await formatQuoteNumber(seq, year);
+    const { seq } = await nextNumber(tx, "quote");
+    const quoteNumber = await formatQuoteNumber(seq);
     return tx.quote.create({
       data: {
         quoteNumber,
@@ -116,8 +116,8 @@ export async function setQuoteStatus(id: number, status: string) {
 export async function duplicateQuote(id: number) {
   const src = await db.quote.findUniqueOrThrow({ where: { id }, include: { items: true } });
   const copy = await db.$transaction(async (tx) => {
-    const { seq, year } = await nextNumber(tx, "quote");
-    const quoteNumber = await formatQuoteNumber(seq, year);
+    const { seq } = await nextNumber(tx, "quote");
+    const quoteNumber = await formatQuoteNumber(seq);
     return tx.quote.create({
       data: {
         quoteNumber,
@@ -162,8 +162,8 @@ export async function acceptQuoteAndCreateJob(id: number) {
     }
     await tx.quote.update({ where: { id }, data: { status: "Accepted" } });
 
-    const { seq, year } = await nextNumber(tx, "job");
-    const jobNumber = await formatJobNumber(seq, year);
+    const { seq } = await nextNumber(tx, "job");
+    const jobNumber = await formatJobNumber(seq);
     const toStart = await tx.jobStatus.findUniqueOrThrow({ where: { name: "To Start" } });
     const type = quote.projectType
       ? await tx.jobType.findUnique({ where: { name: quote.projectType } })

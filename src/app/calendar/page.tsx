@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import CalendarView, { CalEvent } from "@/components/CalendarView";
 import { PageHeader } from "@/components/ui";
-import { inspectionStatusColor } from "@/lib/constants";
+const DEFAULT_INSPECTION_COLOR = "#6b4ec2"; // consistent fallback when a job has no planner colour
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +38,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
   const [inspections, tasks, jobs] = await Promise.all([
     db.siteInspection.findMany({
       where: { date: { gte: start, lt: end }, status: { notIn: ["Cancelled"] } },
-      include: { job: true, type: true },
+      include: { job: { include: { client: true } }, type: true },
     }),
     db.task.findMany({
       where: { dueDate: { gte: start, lt: end }, completed: false },
@@ -56,13 +56,14 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
       date: toISO(i.date),
       startTime: i.startTime,
       endTime: i.endTime,
-      label: i.job ? String(i.job.jobNumber) : (i.type?.name ?? "Inspection"),
+      label: i.job ? i.job.jobNumber : (i.type?.name ?? "Inspection"),
       sublabel: i.siteAddress,
       title: i.type?.name ?? "Site Inspection",
       jobNumber: i.job?.jobNumber ?? null,
       address: i.siteAddress,
+      clientName: i.job?.client.name ?? i.clientName,
       href: `/inspections/${i.id}`,
-      color: inspectionStatusColor(i.status),
+      color: i.job?.plannerColor || DEFAULT_INSPECTION_COLOR,
     })),
     ...tasks.map((t) => ({
       id: t.id,
@@ -75,6 +76,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
       title: "Task",
       jobNumber: t.job?.jobNumber ?? null,
       address: t.title,
+      clientName: undefined,
       href: "/tasks?filter=today",
       color: "#b45309",
     })),
@@ -89,6 +91,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
       title: "Job Due",
       jobNumber: j.jobNumber,
       address: j.siteAddress || j.name,
+      clientName: undefined,
       href: `/jobs/${j.id}`,
       color: "#64748b",
     })),

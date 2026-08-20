@@ -3,18 +3,20 @@ import { createQuote } from "@/lib/actions/quotes";
 import { peekNextQuoteNumber } from "@/lib/numbering";
 import { getSettings } from "@/lib/settings";
 import { PageHeader, Field } from "@/components/ui";
-import SearchableSelect from "@/components/SearchableSelect";
+import ClientSelect from "@/components/ClientSelect";
 import LineItemsEditor from "@/components/LineItemsEditor";
+import { presetOpts } from "@/lib/presets";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewQuotePage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const presetClient = searchParams.clientId ?? "";
-  const [clients, types, nextNo, settings] = await Promise.all([
+  const [clients, types, nextNo, settings, presets] = await Promise.all([
     db.client.findMany({ where: { archived: false }, orderBy: { name: "asc" } }),
     db.jobType.findMany({ orderBy: { order: "asc" } }),
     peekNextQuoteNumber(),
     getSettings(),
+    presetOpts(),
   ]);
 
   const defaultValid = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
@@ -31,7 +33,7 @@ export default async function NewQuotePage({ searchParams }: { searchParams: Rec
         <form action={createQuote} className="card space-y-4 p-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Client *">
-              <SearchableSelect
+              <ClientSelect
                 name="clientId" required defaultValue={presetClient}
                 options={clients.map((c) => ({ value: String(c.id), label: c.name, hint: c.company }))}
               />
@@ -51,7 +53,7 @@ export default async function NewQuotePage({ searchParams }: { searchParams: Rec
 
           <div>
             <h3 className="section-title mb-2">Fee Items</h3>
-            <LineItemsEditor items={[]} gstRate={settings.gstRate} />
+            <LineItemsEditor items={[]} gstRate={settings.gstRate} presets={presets} />
           </div>
 
           <Field label="Internal Notes"><textarea name="notes" rows={2} className="input" /></Field>

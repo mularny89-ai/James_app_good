@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import SearchableSelect from "@/components/SearchableSelect";
-import LineItemsEditor, { LineItemRow } from "@/components/LineItemsEditor";
+import LineItemsEditor, { LineItemRow, PresetOpt } from "@/components/LineItemsEditor";
 import { Field } from "@/components/ui";
 
 type JobOpt = {
   id: number;
-  jobNumber: number;
+  jobNumber: string;
   name: string;
   siteAddress: string;
   billingAddress: string;
@@ -21,12 +21,14 @@ export default function InvoiceForm({
   defaultJobId,
   gstRate,
   invoice,
+  presets = [],
   submitLabel = "Create Invoice",
 }: {
   action: (fd: FormData) => Promise<void>;
   jobs: JobOpt[];
   defaultJobId?: number;
   gstRate: number;
+  presets?: PresetOpt[];
   invoice?: {
     jobId: number | null;
     siteAddress: string;
@@ -82,7 +84,7 @@ export default function InvoiceForm({
 
       <div>
         <h3 className="section-title mb-2">Line Items</h3>
-        <LineItemsEditor items={defaultItems} gstRate={gstRate} />
+        <LineItemsEditor items={defaultItems} gstRate={gstRate} presets={presets} />
       </div>
 
       <Field label="Notes"><textarea name="notes" rows={2} className="input" defaultValue={invoice?.notes ?? ""} /></Field>

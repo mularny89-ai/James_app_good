@@ -5,8 +5,9 @@ import { getSettings } from "@/lib/settings";
 import { toInputDate } from "@/lib/format";
 import { updateQuote, setQuoteStatus, duplicateQuote, acceptQuoteAndCreateJob, archiveQuote } from "@/lib/actions/quotes";
 import { PageHeader, SoftBadge, Field } from "@/components/ui";
-import SearchableSelect from "@/components/SearchableSelect";
+import ClientSelect from "@/components/ClientSelect";
 import LineItemsEditor from "@/components/LineItemsEditor";
+import { presetOpts } from "@/lib/presets";
 import BrandDocument from "@/components/BrandDocument";
 import ConfirmButton from "@/components/ConfirmButton";
 import PrintButton from "@/components/PrintButton";
@@ -24,11 +25,12 @@ export default async function QuoteDetailPage({
   const id = parseInt(params.id);
   const mode = searchParams.mode ?? "preview";
 
-  const [quote, settings, clients, types] = await Promise.all([
+  const [quote, settings, clients, types, presets] = await Promise.all([
     db.quote.findUnique({ where: { id }, include: { items: { orderBy: { order: "asc" } }, client: true, job: true, activities: { orderBy: { createdAt: "desc" }, take: 20 } } }),
     getSettings(),
     db.client.findMany({ where: { archived: false }, orderBy: { name: "asc" } }),
     db.jobType.findMany({ orderBy: { order: "asc" } }),
+    presetOpts(),
   ]);
   if (!quote) notFound();
 
@@ -103,7 +105,7 @@ export default async function QuoteDetailPage({
         <form action={updateBound} className="card mx-auto max-w-4xl space-y-4 p-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Client *">
-              <SearchableSelect name="clientId" required defaultValue={String(quote.clientId)}
+              <ClientSelect name="clientId" required defaultValue={String(quote.clientId)}
                 options={clients.map((c) => ({ value: String(c.id), label: c.name, hint: c.company }))} />
             </Field>
             <Field label="Client Contact"><input name="contactName" className="input" defaultValue={quote.contactName} /></Field>
@@ -123,6 +125,7 @@ export default async function QuoteDetailPage({
             <h3 className="section-title mb-2">Fee Items</h3>
             <LineItemsEditor
               items={quote.items.map((i) => ({ description: i.description, qty: i.qty, unitPrice: i.unitPrice }))}
+              presets={presets}
               gstRate={settings.gstRate}
             />
           </div>

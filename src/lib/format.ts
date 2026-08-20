@@ -86,6 +86,16 @@ export type AddressParts = {
   country?: string | null;
 };
 
+/** Return "#ffffff" or "#1e2430" depending on the background luminance. */
+export function readableTextOn(hex?: string | null): string {
+  if (!hex) return "#ffffff";
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  if (isNaN(n)) return "#ffffff";
+  const lum = 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+  return lum > 148 ? "#1e2430" : "#ffffff";
+}
+
 /** Single reusable display formatter: "14 Example Street, Broadbeach QLD 4218". */
 export function fmtAddress(p: AddressParts): string {
   const street = (p.street ?? "").trim();

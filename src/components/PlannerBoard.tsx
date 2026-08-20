@@ -14,7 +14,7 @@ import {
 
 export type PlannerJobData = {
   id: number;
-  jobNumber: number;
+  jobNumber: string;
   name: string;
   siteAddress: string;
   siteStreet: string;
@@ -39,7 +39,7 @@ export type PlannerJobData = {
 
 export type UnscheduledJobData = {
   id: number;
-  jobNumber: number;
+  jobNumber: string;
   name: string;
   siteAddress: string;
   clientName: string;
@@ -138,7 +138,7 @@ export default function PlannerBoard({
     switch (sort) {
       case "start": return arr.sort((a, b) => a.startISO.localeCompare(b.startISO));
       case "end": return arr.sort((a, b) => a.endISO.localeCompare(b.endISO));
-      case "number": return arr.sort((a, b) => a.jobNumber - b.jobNumber);
+      case "number": return arr.sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
       case "priority": return arr.sort((a, b) => (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9));
       case "engineer":
       case "engineer-group":
@@ -418,7 +418,7 @@ export default function PlannerBoard({
                               onClick={() => setPopoverId(j.id)}
                               title={`${j.jobNumber} — ${j.siteAddress || j.name}`}
                             >
-                              {j.jobNumber} — {j.siteStreet || j.name}
+                              {j.jobNumber} — {j.siteAddress || j.name}
                             </button>
                             <div className="truncate text-[11px] text-ink-muted">
                               {j.clientName}{j.engineer ? ` · ${j.engineer}` : ""}
@@ -438,8 +438,13 @@ export default function PlannerBoard({
                             {dayCols.map((d) => (
                               <div
                                 key={d.iso}
-                                className={`h-full shrink-0 border-l border-line/60 ${d.isWeekend ? "bg-gray-50" : ""} ${d.isToday ? "bg-indigo-50" : ""}`}
-                                style={{ width: colW }}
+                                className={`h-full shrink-0 border-l border-line/60 ${d.isWeekend ? "bg-gray-100" : ""} ${d.isToday ? "bg-indigo-50" : ""}`}
+                                style={{
+                                  width: colW,
+                                  ...(d.isWeekend
+                                    ? { backgroundImage: "repeating-linear-gradient(135deg, rgba(0,0,0,0.06) 0 4px, transparent 4px 8px)" }
+                                    : {}),
+                                }}
                               />
                             ))}
                           </div>
@@ -464,7 +469,7 @@ export default function PlannerBoard({
                               {span.clippedLeft && <span className="mr-0.5">◂</span>}
                               <span className="truncate">
                                 {(span.endIdx - span.startIdx + 1) * colW >= 90
-                                  ? `${j.jobNumber} — ${j.siteStreet || j.name}`
+                                  ? `${j.jobNumber} — ${j.siteAddress || j.name}`
                                   : j.jobNumber}
                               </span>
                               {span.clippedRight && <span className="ml-0.5">▸</span>}

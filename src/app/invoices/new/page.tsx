@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { createInvoice } from "@/lib/actions/invoices";
 import { getSettings } from "@/lib/settings";
+import { presetOpts } from "@/lib/presets";
 import { PageHeader } from "@/components/ui";
 import InvoiceForm from "@/components/InvoiceForm";
 
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewInvoicePage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const defaultJobId = searchParams.jobId ? parseInt(searchParams.jobId) : undefined;
-  const settings = await getSettings();
+  const [settings, presets] = await Promise.all([getSettings(), presetOpts()]);
 
   const jobs = await db.job.findMany({
     where: { archived: false, status: { name: { notIn: ["Cancelled"] } } },
@@ -41,7 +42,7 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: R
           <a href="/jobs/new" className="link font-medium">create a job first →</a>
         </div>
       ) : (
-        <InvoiceForm action={createInvoice} jobs={jobOpts} defaultJobId={defaultJobId} gstRate={settings.gstRate} />
+        <InvoiceForm action={createInvoice} jobs={jobOpts} defaultJobId={defaultJobId} gstRate={settings.gstRate} presets={presets} />
       )}
     </div>
   );

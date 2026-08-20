@@ -16,7 +16,7 @@ function SubmitButton({ label }: { label: string }) {
   );
 }
 
-type JobOpt = { id: number; jobNumber: number; name: string; clientName: string; siteAddress: string; clientContact: string; clientPhone: string; clientEmail: string };
+type JobOpt = { id: number; jobNumber: string; name: string; clientName: string; siteAddress: string; clientContact: string; clientPhone: string; clientEmail: string };
 type InspType = { id: number; name: string };
 
 export type InspectionDTO = {

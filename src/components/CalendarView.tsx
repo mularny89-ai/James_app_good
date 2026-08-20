@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { rescheduleInspection } from "@/lib/actions/inspections";
+import { readableTextOn } from "@/lib/format";
 
 export type CalEvent = {
   id: number;
@@ -13,8 +14,9 @@ export type CalEvent = {
   label: string;
   sublabel: string;
   title?: string;      // event type, e.g. "Site Inspection"
-  jobNumber?: number | null;
+  jobNumber?: string | null;
   address?: string;
+  clientName?: string;
   href: string;
   color: string;
 };
@@ -44,28 +46,30 @@ function EventChip({ ev, compact }: { ev: CalEvent; compact?: boolean }) {
         onDragStart={(e) => e.dataTransfer.setData("text/event", JSON.stringify({ id: ev.id, kind: ev.kind }))}
         onClick={() => router.push(ev.href)}
         className="cal-event"
-        style={{ backgroundColor: ev.color, cursor: ev.kind === "inspection" ? "grab" : "pointer" }}
-        title={`${ev.startTime} ${ev.label} — ${ev.sublabel}`}
+        style={{ backgroundColor: ev.color, color: readableTextOn(ev.color), cursor: ev.kind === "inspection" ? "grab" : "pointer" }}
+        title={`${ev.startTime} ${ev.title ?? ev.label} — ${ev.sublabel}`}
       >
-        {ev.startTime} {ev.label}
+        {ev.startTime} {ev.title ?? ev.label}{ev.jobNumber != null ? ` ${ev.jobNumber}` : ""}
       </button>
     );
   }
-  // Day/week blocks: event type, time, job number, address — in that priority.
+  // Day/week blocks: event type, time, job number, address, client — in that priority.
   const timeLabel = fmtTime12(ev.startTime) + (ev.endTime ? `–${fmtTime12(ev.endTime)}` : "");
+  const fg = readableTextOn(ev.color);
   return (
     <button
       draggable={ev.kind === "inspection"}
       onDragStart={(e) => e.dataTransfer.setData("text/event", JSON.stringify({ id: ev.id, kind: ev.kind }))}
       onClick={() => router.push(ev.href)}
       className="cal-event"
-      style={{ backgroundColor: ev.color, cursor: ev.kind === "inspection" ? "grab" : "pointer", whiteSpace: "normal", overflow: "hidden" }}
-      title={`${timeLabel} ${ev.title ?? ev.label} — ${ev.sublabel}`}
+      style={{ backgroundColor: ev.color, color: fg, cursor: ev.kind === "inspection" ? "grab" : "pointer", whiteSpace: "normal", overflow: "hidden" }}
+      title={`${timeLabel} ${ev.title ?? ev.label} — ${ev.address ?? ev.sublabel}${ev.clientName ? ` (${ev.clientName})` : ""}`}
     >
       <span className="block truncate text-[11px] font-bold leading-tight">{ev.title ?? ev.label}</span>
       {timeLabel && <span className="block truncate text-[10px] leading-tight">{timeLabel}</span>}
-      {ev.jobNumber != null && <span className="block truncate text-[10px] leading-tight">Job {ev.jobNumber}</span>}
-      {ev.address && <span className="block truncate text-[10px] leading-tight opacity-90">{ev.address}</span>}
+      {ev.jobNumber != null && <span className="block truncate text-[10px] leading-tight">{ev.jobNumber}</span>}
+      {ev.address && <span className="block truncate text-[10px] leading-tight">{ev.address}</span>}
+      {ev.clientName && <span className="block truncate text-[10px] leading-tight opacity-90">{ev.clientName}</span>}
     </button>
   );
 }

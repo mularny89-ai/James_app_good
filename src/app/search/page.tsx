@@ -12,7 +12,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Recor
   const contains = { contains: q };
 
   let jobs: any[] = [], clients: any[] = [], quotes: any[] = [], invoices: any[] = [], tasks: any[] = [], inspections: any[] = [];
-  const asNumber = parseInt(q);
+
 
   if (q) {
     [jobs, clients, quotes, invoices, tasks, inspections] = await Promise.all([
@@ -21,7 +21,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Recor
           archived: false,
           OR: [
             { name: contains }, { siteAddress: contains }, { description: contains }, { scope: contains },
-            ...(isNaN(asNumber) ? [] : [{ jobNumber: asNumber }]),
+            { jobNumber: contains },
           ],
         },
         include: { client: true, status: true }, take: 25,

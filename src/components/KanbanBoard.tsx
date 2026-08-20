@@ -8,7 +8,7 @@ import { priorityColor } from "@/lib/constants";
 
 type BoardJob = {
   id: number;
-  jobNumber: number;
+  jobNumber: string;
   name: string;
   clientName: string;
   dueDate: string | null;
