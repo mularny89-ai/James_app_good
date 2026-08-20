@@ -17,17 +17,17 @@ export type PresetOpt = {
 const money = (n: number) => `$${n.toFixed(2)}`;
 
 const GREEN_BTN =
-  "inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 active:bg-emerald-800";
+  "inline-flex items-center gap-1 rounded-md bg-[#34368b] px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#2b2d76] active:bg-[#242663]";
 
-/** Green "Add A Task" action button (shared by the toolbar and the empty-state panel). */
-function AddTaskButton({ onClick, big = false }: { onClick: () => void; big?: boolean }) {
+/** "Add A Task" action button in the tasks toolbar. */
+function AddTaskButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title="Add a task"
       aria-label="Add a task"
-      className={big ? `${GREEN_BTN} px-4 py-2 text-base` : GREEN_BTN}
+      className={GREEN_BTN}
     >
       <span className="font-bold leading-none">+</span> Add A Task
     </button>
@@ -286,7 +286,6 @@ export default function TaskItemsEditor({
 
         {rows.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-3 py-10 text-center">
-            <AddTaskButton onClick={openModal} big />
             <button type="button" className="link text-sm font-medium" onClick={openModal}>
               Add a Task
             </button>
