@@ -16,6 +16,21 @@ export type PresetOpt = {
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 
+/** Blue square "+" action button — shared Add Task trigger for quotes and invoices. */
+function BlueAddButton({ onClick, className = "" }: { onClick: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Add a task"
+      aria-label="Add a task"
+      className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-600 text-xl font-bold leading-none text-white shadow-sm transition-colors hover:bg-blue-700 active:bg-blue-800 ${className}`}
+    >
+      +
+    </button>
+  );
+}
+
 /**
  * Structured TASKS editor shared by quotes and invoices.
  * Each row is a Task: a heading (name) plus a separate description, qty, rate
@@ -45,6 +60,8 @@ export default function TaskItemsEditor({
 
   const addTask = (row: TaskItemRow) => setRows((rs) => [...rs, row]);
 
+  const addBlankTask = () => addTask({ name: "", description: "", qty: 1, unitPrice: 0, gst: true });
+
   const applyPreset = (v: string) => {
     const p = presets.find((x) => x.value === v);
     if (!p) return;
@@ -70,6 +87,7 @@ export default function TaskItemsEditor({
       <input type="hidden" name="itemsJson" value={JSON.stringify(rows)} />
 
       <div className="mb-3 flex flex-wrap items-end gap-2">
+        <BlueAddButton onClick={addBlankTask} />
         <div className="w-full max-w-md">
           <span className="label">Task</span>
           {/* key remounts the widget so it resets after each pick */}
@@ -84,7 +102,7 @@ export default function TaskItemsEditor({
         <button
           type="button"
           className="btn"
-          onClick={() => addTask({ name: "", description: "", qty: 1, unitPrice: 0, gst: true })}
+          onClick={addBlankTask}
         >
           + Custom Task
         </button>
@@ -94,9 +112,13 @@ export default function TaskItemsEditor({
       </div>
 
       {rows.length === 0 ? (
-        <p className="rounded-md border border-dashed border-line px-3 py-4 text-center text-sm text-ink-muted">
-          No tasks yet — pick a preset above or add a custom task.
-        </p>
+        <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-line px-3 py-5 text-center">
+          <BlueAddButton onClick={addBlankTask} className="h-12 w-12 text-2xl" />
+          <button type="button" className="link text-sm font-medium" onClick={addBlankTask}>
+            Add a Task
+          </button>
+          <p className="text-sm text-ink-muted">No tasks yet — pick a preset above or add a custom task.</p>
+        </div>
       ) : (
         <div className="space-y-3">
           {rows.map((r, i) => (
