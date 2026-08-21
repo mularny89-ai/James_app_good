@@ -265,7 +265,6 @@ export default function TaskItemsEditor({
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <button type="button" className="btn" onClick={openModal} title="Add several tasks in a row">+ Add Multiple Tasks</button>
           <AddTaskButton onClick={openModal} />
           <button type="button" className="btn" onClick={() => setShowPreview((s) => !s)}>
             {showPreview ? "Hide Preview" : `Preview ${documentTitle}`}
