@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { fmtDate, isOverdue } from "@/lib/format";
+import { fmtDate, isOverdue, displayJobName } from "@/lib/format";
 import { PageHeader, EmptyState, SoftBadge } from "@/components/ui";
 import KanbanBoard from "@/components/KanbanBoard";
 import { priorityColor } from "@/lib/constants";
@@ -150,7 +150,7 @@ export default async function JobsPage({
                     <Link href={`/jobs/${j.id}`} className="link">{j.jobNumber}</Link>
                   </td>
                   <td className="td max-w-64 truncate">
-                    <Link href={`/jobs/${j.id}`} className="link">{j.name}</Link>
+                    <Link href={`/jobs/${j.id}`} className="link">{displayJobName(j)}</Link>
                     {j.siteAddress && <div className="truncate text-xs text-ink-muted">{j.siteAddress}</div>}
                   </td>
                   <td className="td">

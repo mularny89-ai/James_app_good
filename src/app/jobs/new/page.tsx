@@ -44,9 +44,6 @@ export default async function NewJobPage({ searchParams }: { searchParams: Recor
             <Field label="Client Contact">
               <input name="clientContact" className="input" placeholder="Defaults to client contact person" />
             </Field>
-            <Field label="Job / Project Name">
-              <input name="name" className="input" placeholder="e.g. 14 Example Street, Broadbeach" />
-            </Field>
             <Field label="Project Type">
               <select name="projectType" className="input" defaultValue="">
                 <option value="">—</option>

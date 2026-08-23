@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { moveJob } from "@/lib/actions/jobs";
 import MoveTo from "@/components/MoveTo";
 import { priorityColor } from "@/lib/constants";
+import { displayJobName } from "@/lib/format";
 
 type BoardJob = {
   id: number;
@@ -87,7 +88,7 @@ export default function KanbanBoard({
                   </span>
                 </div>
                 <Link href={`/jobs/${job.id}`} className="mt-0.5 block truncate text-sm font-medium hover:underline">
-                  {job.name}
+                  {displayJobName(job)}
                 </Link>
                 <div className="truncate text-xs text-ink-muted">{job.clientName}</div>
                 <div className="mt-1.5 flex items-center justify-between text-xs">

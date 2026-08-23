@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { fmtDate, fmtDateTime, fmtMoney, toInputDate } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtMoney, toInputDate, displayJobName } from "@/lib/format";
 import { updateJob, moveJobById, addDocument, deleteDocument } from "@/lib/actions/jobs";
 import { createTask } from "@/lib/actions/tasks";
 import { PageHeader, SoftBadge, EmptyState, Field, StatRow, Badge } from "@/components/ui";
@@ -72,7 +72,7 @@ export default async function JobDetailPage({
         title={
           <span>
             <span style={{ color: "var(--brand-primary)" }}>{job.jobNumber}</span>
-            <span className="ml-3">{job.name}</span>
+            {displayJobName(job) && <span className="ml-3">{displayJobName(job)}</span>}
           </span>
         }
         subtitle={

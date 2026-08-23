@@ -119,3 +119,10 @@ export function splitAddress(full: string): { street: string; suburb: string } {
   if (i === -1) return { street: v, suburb: "" };
   return { street: v.slice(0, i).trim(), suburb: v.slice(i + 1).trim() };
 }
+
+/** Job names are derived as "J66XXX — address"; strip the number where it's already displayed. */
+export function displayJobName(job: { jobNumber: string; name: string }): string {
+  return job.name.startsWith(job.jobNumber)
+    ? job.name.slice(job.jobNumber.length).replace(/^\s*—\s*/, "")
+    : job.name;
+}

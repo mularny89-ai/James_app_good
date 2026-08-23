@@ -4,6 +4,7 @@ import { useState } from "react";
 import SearchableSelect from "@/components/SearchableSelect";
 import TaskItemsEditor, { TaskItemRow, PresetOpt } from "@/components/TaskItemsEditor";
 import { Field } from "@/components/ui";
+import { displayJobName } from "@/lib/format";
 
 type JobOpt = {
   id: number;
@@ -44,7 +45,7 @@ export default function InvoiceForm({
   const [job, setJob] = useState<JobOpt | null>(initialJob);
 
   const defaultItems: TaskItemRow[] = invoice?.items ?? (job
-    ? [{ name: "Structural Engineering Services", description: `Job ${job.jobNumber} (${job.name})`, qty: 1, unitPrice: Math.max(job.remainingFee, 0), gst: true }]
+    ? [{ name: "Structural Engineering Services", description: `Job ${job.jobNumber} (${displayJobName(job)})`, qty: 1, unitPrice: Math.max(job.remainingFee, 0), gst: true }]
     : []);
 
   return (
@@ -55,7 +56,7 @@ export default function InvoiceForm({
             name="jobId"
             defaultValue={job ? String(job.id) : ""}
             placeholder="Search job number or address…"
-            options={jobs.map((j) => ({ value: String(j.id), label: `${j.jobNumber} — ${j.name}`, hint: j.siteAddress }))}
+            options={jobs.map((j) => ({ value: String(j.id), label: `${j.jobNumber} — ${displayJobName(j)}`, hint: j.siteAddress }))}
             onChange={(v) => setJob(jobs.find((j) => String(j.id) === v) ?? null)}
           />
         </Field>
@@ -66,7 +67,7 @@ export default function InvoiceForm({
           />
         </Field>
         <Field label="Description" className="sm:col-span-2">
-          <input name="description" className="input" defaultValue={invoice?.description ?? (job ? `Job ${job.jobNumber} — ${job.name}` : "")} />
+          <input name="description" className="input" defaultValue={invoice?.description ?? (job ? `Job ${job.jobNumber} — ${displayJobName(job)}` : "")} />
         </Field>
         <Field label="Billing Address" className="sm:col-span-2">
           <input name="billingAddress" className="input" defaultValue={invoice?.billingAddress ?? job?.billingAddress ?? ""} />

@@ -6,6 +6,7 @@ import SearchableSelect from "@/components/SearchableSelect";
 import ColorPicker from "@/components/ColorPicker";
 import { Field } from "@/components/ui";
 import { INSPECTION_STATUSES } from "@/lib/constants";
+import { displayJobName } from "@/lib/format";
 
 function SubmitButton({ label }: { label: string }) {
   // Disabled while the server action runs — prevents duplicate inspections.
@@ -76,7 +77,7 @@ export default function InspectionForm({
               { value: "", label: "No Job / Enter Address Manually" },
               ...jobs.map((j) => ({
                 value: String(j.id),
-                label: j.siteAddress ? `${j.jobNumber} — ${j.siteAddress}` : `${j.jobNumber} — ${j.name}`,
+                label: j.siteAddress ? `${j.jobNumber} — ${j.siteAddress}` : `${j.jobNumber} — ${displayJobName(j)}`,
                 hint: j.clientName,
               })),
             ]}

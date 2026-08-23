@@ -54,7 +54,6 @@ export async function createJob(fd: FormData) {
   if (!client) redirect("/jobs/new?error=client");
   const site = siteFields(fd);
   const emp = await employeeOf(fd);
-  const name = str(fd, "name") || site.siteAddress || "Untitled Job";
 
   // Optional planner scheduling picked up from the new-job form (Section 43)
   const plannedStartISO = str(fd, "plannedStart");
@@ -64,6 +63,8 @@ export async function createJob(fd: FormData) {
   const job = await db.$transaction(async (tx) => {
     const { seq } = await nextNumber(tx, "job");
     const jobNumber = await formatJobNumber(seq);
+    // Name is derived, never typed: J66XXX — address (falls back to the number alone).
+    const name = site.siteAddress ? `${jobNumber} — ${site.siteAddress}` : jobNumber;
     const typeName = str(fd, "projectType");
     const type = typeName ? await tx.jobType.findUnique({ where: { name: typeName } }) : null;
     return tx.job.create({

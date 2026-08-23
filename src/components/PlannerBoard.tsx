@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useRef, useState, useTransition, useEffect } from "react";
 import SearchableSelect from "@/components/SearchableSelect";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, displayJobName } from "@/lib/format";
 import {
   PLANNER_PALETTE, VIEW_COL_W, chunkWeeks, durationBetween, fromIsoDay, unitLabel, type PlannerView,
 } from "@/lib/planner";
@@ -464,9 +464,9 @@ export default function PlannerBoard({
                             <button
                               className="link block truncate text-left text-sm font-semibold"
                               onClick={() => setPopoverId(j.id)}
-                              title={`${j.jobNumber} — ${j.siteAddress || j.name}`}
+                              title={`${j.jobNumber} — ${j.siteAddress || displayJobName(j)}`}
                             >
-                              {j.jobNumber} — {j.siteAddress || j.name}
+                              {j.jobNumber} — {j.siteAddress || displayJobName(j)}
                             </button>
                             <div className="truncate text-[11px] text-ink-muted">
                               {j.clientName}{j.engineer ? ` · ${j.engineer}` : ""}
@@ -512,12 +512,12 @@ export default function PlannerBoard({
                                 backgroundColor: j.color,
                                 outline: j.overdue ? "2px solid #b45309" : undefined,
                               }}
-                              title={`${j.jobNumber} — ${j.siteAddress || j.name}\n${j.planningLabel}`}
+                              title={`${j.jobNumber} — ${j.siteAddress || displayJobName(j)}\n${j.planningLabel}`}
                             >
                               {span.clippedLeft && <span className="mr-0.5">◂</span>}
                               <span className="truncate">
                                 {(span.endIdx - span.startIdx + 1) * colW >= 90
-                                  ? `${j.jobNumber} — ${j.siteAddress || j.name}`
+                                  ? `${j.jobNumber} — ${j.siteAddress || displayJobName(j)}`
                                   : j.jobNumber}
                               </span>
                               {span.clippedRight && <span className="ml-0.5">▸</span>}

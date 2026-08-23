@@ -192,7 +192,7 @@ export async function acceptQuoteAndCreateJob(id: number) {
     const job = await tx.job.create({
       data: {
         jobNumber,
-        name: quote.project || quote.siteAddress || `Job for ${quote.client.name}`,
+        name: quote.siteAddress ? `${jobNumber} — ${quote.siteAddress}` : jobNumber,
         clientId: quote.clientId,
         clientContact: quote.contactName,
         siteAddress: quote.siteAddress,
