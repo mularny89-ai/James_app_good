@@ -94,6 +94,11 @@ Shared **`src/components/TaskItemsEditor.tsx`** drives the Tasks section on both
 - **New Job form has no "Job / Project Name" field** — name is derived in `createJob` (`src/lib/actions/jobs.ts`) inside the number transaction: `` `${jobNumber} — ${siteAddress}` `` (falls back to the number alone). Quote→job conversion (`acceptQuoteAndCreateJob`) names jobs the same way.
 - **`displayJobName(job)`** in `src/lib/format.ts` strips the leading `<jobNumber> — ` wherever the number is already displayed: jobs list, job detail header, KanbanBoard cards, InvoiceForm job picker/default line/description, InspectionForm picker fallback, PlannerBoard label fallbacks. Old jobs (name ≠ derived format) render unchanged.
 
+## Invoice numbering unified (2026-08-21)
+
+- Invoices use the **same prefix + fixed-width digits scheme as jobs/quotes** — the legacy `invoiceFormat` YY#### template is retired (schema field kept but unused; `invoiceDigits Int @default(4)` added). `nextNumber`/`peek` run every key against `NumberSequence` year 0; Settings → Numbering shows the identical Prefix/Sequence Digits/Next Sequence/Live Preview row for invoices; `saveNumberingSettings` saves `invoiceDigits` + `invoiceNext`.
+- Gotcha: invoice creation from `?jobId=` errors "Select a client or a job." when the SearchableSelect job picker remounts empty — the invoice form's `jobId` hidden input can reset on key-based remount; verify by explicitly picking the job in the dropdown before submitting.
+
 ## Server/process gotchas (recurring)
 
 - Port conflicts on restart: `for p in $(ps aux | grep next-server | grep -v grep | awk '{print $2}'); do kill -9 $p; done` before `npm run start`.

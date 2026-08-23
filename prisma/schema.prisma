@@ -30,6 +30,7 @@ model CompanySettings {
   quotePrefix      String  @default("Q66")
   quoteDigits      Int     @default(3)
   invoicePrefix    String  @default("INV-")
+  invoiceDigits    Int     @default(4)
   invoiceFormat    String  @default("YY####")
   // Preferences
   dateFormat       String  @default("d MMM yyyy") // Australian

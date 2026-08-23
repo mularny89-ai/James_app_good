@@ -67,8 +67,8 @@ export async function createInvoice(fd: FormData) {
   const t = totals(items, settings.gstRate);
 
   const invoice = await db.$transaction(async (tx) => {
-    const { seq, year } = await nextNumber(tx, "invoice");
-    const invoiceNumber = await formatInvoiceNumber(seq, year);
+    const { seq } = await nextNumber(tx, "invoice");
+    const invoiceNumber = await formatInvoiceNumber(seq);
     return tx.invoice.create({
       data: {
         invoiceNumber,

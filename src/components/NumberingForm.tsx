@@ -19,7 +19,8 @@ export default function NumberingForm({
   quoteDigits,
   quoteNext,
   invoicePrefix,
-  invoiceFormat,
+  invoiceDigits,
+  invoiceNext,
 }: {
   jobPrefix: string;
   jobDigits: number;
@@ -28,7 +29,8 @@ export default function NumberingForm({
   quoteDigits: number;
   quoteNext: number;
   invoicePrefix: string;
-  invoiceFormat: string;
+  invoiceDigits: number;
+  invoiceNext: number;
 }) {
   const [jp, setJp] = useState(jobPrefix);
   const [jd, setJd] = useState(jobDigits);
@@ -36,12 +38,16 @@ export default function NumberingForm({
   const [qp, setQp] = useState(quotePrefix);
   const [qd, setQd] = useState(quoteDigits);
   const [qn, setQn] = useState(quoteNext);
+  const [ip, setIp] = useState(invoicePrefix);
+  const [idg, setIdg] = useState(invoiceDigits);
+  const [inx, setInx] = useState(invoiceNext);
 
   return (
     <form action={saveNumberingSettings} className="card space-y-5 p-5">
       <p className="text-sm text-ink-muted">
-        Job and Quote counters are independent — quotes never consume job numbers. Changing these
-        settings affects future records only; existing numbers are never renumbered.
+        Job, Quote and Invoice counters are independent — invoices never consume job or quote
+        numbers. Changing these settings affects future records only; existing numbers are never
+        renumbered.
       </p>
 
       <div>
@@ -66,9 +72,11 @@ export default function NumberingForm({
 
       <div>
         <h3 className="section-title mb-2">Invoice Numbering</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Prefix"><input name="invoicePrefix" className="input" defaultValue={invoicePrefix} /></Field>
-          <Field label="Format (YY = year, # = digits)"><input name="invoiceFormat" className="input" defaultValue={invoiceFormat} /></Field>
+        <div className="grid gap-4 sm:grid-cols-4">
+          <Field label="Prefix"><input name="invoicePrefix" className="input" value={ip} onChange={(e) => setIp(e.target.value)} /></Field>
+          <Field label="Sequence Digits"><input type="number" min={1} max={8} name="invoiceDigits" className="input" value={idg} onChange={(e) => setIdg(parseInt(e.target.value))} /></Field>
+          <Field label="Next Sequence"><input type="number" min={1} name="invoiceNext" className="input" value={inx} onChange={(e) => setInx(parseInt(e.target.value))} /></Field>
+          <Field label="Live Preview"><div className="input flex items-center bg-gray-50"><Preview prefix={ip} digits={idg} next={inx} /></div></Field>
         </div>
       </div>
 

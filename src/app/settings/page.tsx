@@ -25,14 +25,14 @@ const TABS = [
   { key: "preferences", label: "Preferences" },
 ];
 
-const nextOf = async (key: "job" | "quote"): Promise<number> => {
+const nextOf = async (key: "job" | "quote" | "invoice"): Promise<number> => {
   const row = await db.numberSequence.findUnique({ where: { key_year: { key, year: 0 } } });
   return row?.nextValue ?? 1;
 };
 
 export default async function SettingsPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const tab = searchParams.tab ?? "company";
-  const [settings, statuses, types, lists, inspTypes, employees, presets, jobNext, quoteNext] = await Promise.all([
+  const [settings, statuses, types, lists, inspTypes, employees, presets, jobNext, quoteNext, invoiceNext] = await Promise.all([
     getSettings(),
     db.jobStatus.findMany({ orderBy: { order: "asc" } }),
     db.jobType.findMany({ orderBy: { order: "asc" } }),
@@ -42,6 +42,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Rec
     db.invoicePreset.findMany({ orderBy: { order: "asc" } }),
     nextOf("job"),
     nextOf("quote"),
+    nextOf("invoice"),
   ]);
 
   return (
@@ -92,7 +93,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Rec
             quoteDigits={settings.quoteDigits}
             quoteNext={quoteNext}
             invoicePrefix={settings.invoicePrefix}
-            invoiceFormat={settings.invoiceFormat}
+            invoiceDigits={settings.invoiceDigits}
+            invoiceNext={invoiceNext}
           />
         )}
 

@@ -37,6 +37,7 @@ export async function saveBrandingSettings(fd: FormData) {
 export async function saveNumberingSettings(fd: FormData) {
   const jobDigits = parseInt(str(fd, "jobDigits")) || 3;
   const quoteDigits = parseInt(str(fd, "quoteDigits")) || 3;
+  const invoiceDigits = parseInt(str(fd, "invoiceDigits")) || 4;
   await db.companySettings.upsert({
     where: { id: 1 },
     update: {
@@ -45,7 +46,7 @@ export async function saveNumberingSettings(fd: FormData) {
       quotePrefix: str(fd, "quotePrefix") || "Q66",
       quoteDigits,
       invoicePrefix: str(fd, "invoicePrefix") || "INV-",
-      invoiceFormat: str(fd, "invoiceFormat") || "YY####",
+      invoiceDigits,
     },
     create: { id: 1 },
   });
@@ -53,6 +54,7 @@ export async function saveNumberingSettings(fd: FormData) {
   // are never renumbered — only future allocations are affected.
   const jobNext = parseInt(str(fd, "jobNext"));
   const quoteNext = parseInt(str(fd, "quoteNext"));
+  const invoiceNext = parseInt(str(fd, "invoiceNext"));
   if (jobNext > 0) {
     await db.numberSequence.upsert({
       where: { key_year: { key: "job", year: 0 } },
@@ -65,6 +67,13 @@ export async function saveNumberingSettings(fd: FormData) {
       where: { key_year: { key: "quote", year: 0 } },
       update: { nextValue: quoteNext },
       create: { key: "quote", year: 0, nextValue: quoteNext },
+    });
+  }
+  if (invoiceNext > 0) {
+    await db.numberSequence.upsert({
+      where: { key_year: { key: "invoice", year: 0 } },
+      update: { nextValue: invoiceNext },
+      create: { key: "invoice", year: 0, nextValue: invoiceNext },
     });
   }
   revalidatePath("/", "layout");

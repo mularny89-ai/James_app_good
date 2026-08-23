@@ -4,26 +4,26 @@ import type { Prisma } from "@prisma/client";
 
 type SeqKey = "job" | "quote" | "invoice";
 
-// Job and quote numbering is prefix + fixed-width digits (e.g. J66 + 001).
-// Invoices keep the legacy YY#### format, so their sequence rows are year-keyed.
+// Jobs, quotes and invoices all use prefix + fixed-width digits with a single
+// running counter (internal year 0) — the legacy invoice YY#### scheme is gone.
 const NO_YEAR = 0;
 
 /**
- * Atomically allocate the next sequence for a key. Year-based keys (invoice)
- * pass their year; plain-sequence keys (job, quote) run against internal year 0.
+ * Atomically allocate the next sequence for a key. The optional year argument
+ * is ignored — kept only for call-site compatibility.
  */
 export async function nextNumber(
   tx: Prisma.TransactionClient,
   key: SeqKey,
-  year?: number
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _year?: number
 ): Promise<{ seq: number; year: number }> {
-  const y = key === "invoice" ? (year ?? new Date().getFullYear()) : NO_YEAR;
   const row = await tx.numberSequence.upsert({
-    where: { key_year: { key, year: y } },
+    where: { key_year: { key, year: NO_YEAR } },
     update: { nextValue: { increment: 1 } },
-    create: { key, year: y, nextValue: 2 },
+    create: { key, year: NO_YEAR, nextValue: 2 },
   });
-  return { seq: row.nextValue - 1, year: y };
+  return { seq: row.nextValue - 1, year: NO_YEAR };
 }
 
 /** prefix + zero-padded sequence, e.g. formatNumber("J66", 3, 1) -> "J66001" */
@@ -43,20 +43,14 @@ export async function formatQuoteNumber(seq: number): Promise<string> {
   return formatNumber(s.quotePrefix, s.quoteDigits, seq);
 }
 
-function applyLegacyFormat(format: string, seq: number, year: number): string {
-  const yy = String(year).slice(-2);
-  return format.replace(/YY/g, yy).replace(/#+/g, (m) => String(seq).padStart(m.length, "0"));
-}
-
-/** Invoice number e.g. INV-260001 (legacy YY#### scheme). */
-export async function formatInvoiceNumber(seq: number, year: number): Promise<string> {
+/** Invoice number e.g. INV-0001 — same prefix + digits scheme as jobs/quotes. */
+export async function formatInvoiceNumber(seq: number): Promise<string> {
   const s = await getSettings();
-  return s.invoicePrefix + applyLegacyFormat(s.invoiceFormat, seq, year);
+  return formatNumber(s.invoicePrefix, s.invoiceDigits, seq);
 }
 
 async function peek(key: SeqKey): Promise<number> {
-  const y = key === "invoice" ? new Date().getFullYear() : NO_YEAR;
-  const row = await db.numberSequence.findUnique({ where: { key_year: { key, year: y } } });
+  const row = await db.numberSequence.findUnique({ where: { key_year: { key, year: NO_YEAR } } });
   return row?.nextValue ?? 1;
 }
 
@@ -72,6 +66,5 @@ export async function peekNextQuoteNumber(): Promise<string> {
 
 export async function peekNextInvoiceNumber(): Promise<string> {
   const s = await getSettings();
-  const y = new Date().getFullYear();
-  return s.invoicePrefix + applyLegacyFormat(s.invoiceFormat, await peek("invoice"), y);
+  return formatNumber(s.invoicePrefix, s.invoiceDigits, await peek("invoice"));
 }
