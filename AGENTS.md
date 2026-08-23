@@ -64,7 +64,7 @@ Visual workload scheduler/Gantt for Jobs at `/planner`:
 - **Numbering**: `Job.jobNumber`/`Quote.quoteNumber` are Strings now; Settings → Numbering (`NumberingForm`) edits prefix/digits/next with live preview (defaults J66/Q66); `consumeSequence`/`allocateJobNumber`/`allocateQuoteNumber` in `src/lib/numbering.ts` use `NumberSequence` rows (key, year) in atomic transactions. Existing numbers never touched by settings changes.
 - **ClientSelect** (`src/components/ClientSelect.tsx`): shared search picker with inline "+ Add New Client" modal (pinned `noFilter` option in SearchableSelect); used in jobs/new, quotes/new, quotes/[id]; job edit keeps client fixed. `key={value-selKey}` remount keeps freshly-created client selected.
 - **Planner**: weekends hatched, engineer filter also reads `assignedEmployee`, labels = job № + full street/suburb. **Calendar**: chips use planner colours, show job №.
-- **Testing**: `npm test` → `node tests/run.cjs` (27 assertions, baseline-based so it runs against live data; covers numbering idempotency, existing-number preservation, transaction rollback).
+- **Testing**: `npm test` → `node tests/run.cjs` (baseline-based so it runs against live data; covers numbering idempotency, existing-number preservation, transaction rollback — currently 52 assertions).
 - Gotcha: native `<input type=date>` can't be filled by browser tooling's `browser_type`; verify planner scheduling via planner modal or DB.
 
 ## User Preferences (from update request)
@@ -72,3 +72,25 @@ Visual workload scheduler/Gantt for Jobs at `/planner`:
 - Numbered fix lists — implement in place, do NOT rebuild or duplicate pages; preserve existing structure.
 - Verify changes in the browser before reporting; clean up test data afterwards.
 - Commit with Co-authored-by: openhands <openhands@all-hands.dev>; push to `engineering-app` only when asked.
+
+## Quotes/Invoices task UI rework (2026-08-21, commits 60887e7→79d262c on engineering-app)
+
+Shared **`src/components/TaskItemsEditor.tsx`** drives the Tasks section on both `/quotes/new|/[id]` and `/invoices/new|/[id]` (`SearchableSelect` + preset-driven):
+
+- **Layout** (reference-style): toolbar = "Tasks" label, Search box, blue **+ Add A Task**, **Preview Quote/Invoice** toggle; table header = NAME | BILLABLE RATE | TOTAL | TIME | TAX 1 | BILLABLE; empty panel shows just an "Add a Task" link (no central button); **Quote/Invoice Summary** panel has Cost/Sell + Gross Profit Margin. `TaskItemRow` = `{name, description, qty, unitPrice, gst}`.
+- **Add Task → modal**: "Add new task" (Task * preset dropdown via SearchableSelect + PresetOpt[] from `presetOpts()` in `src/lib/presets.ts` → `db.invoicePreset` active rows; Task Name, Description, Quantity, Billable/Optional toggle-pills, Billable rate, Tax 1 GST 10%, Tax 2 disabled placeholder, Cancel/Save/**Save & Add Another**). Modal is flex-centred (items-center) — user asked it NOT anchored to top. Picking a preset auto-fills name/description/qty/rate/GST; values stay editable.
+- **Button**: brand indigo `#34368b` in `GREEN_BTN` const — user wanted brand colour, not emerald green.
+- **Row view rows**: expand-to-edit, reorder ↑↓, delete ×, GST checkbox.
+- Explicit user removals across iterations: big central empty-state button, "+ Add Multiple Tasks" button.
+- `PresetOpt` added to SearchableSelect usage everywhere presets are picked; hidden input `itemsJson` carries rows to the server action.
+- **Testing**: `npm test` = 52 assertions (expanded baseline; prior 27). Still green after the rework.
+
+## Planner weekly-row rewrite (commit 4dc0ce3)
+
+- New `src/components/PlannerWrappedView.tsx` renders Month / 6 Weeks / 3 Months as stacked Monday–Sunday week rows (PlannerMonthView/PlannerSixWeekView/PlannerThreeMonthView); Week view keeps the horizontal timeline in PlannerBoard. Multi-week bars split with ◂▸ markers. Verified in browser across all 4 views.
+
+## Server/process gotchas (recurring)
+
+- Port conflicts on restart: `for p in $(ps aux | grep next-server | grep -v grep | awk '{print $2}'); do kill -9 $p; done` before `npm run start`.
+- Server dies with idle session → restart with `setsid nohup npm run start > /tmp/next-server.log 2>&1 < /dev/null & disown`.
+- Browser tool quirk: after every click/change of focus, re-run `browser_get_state` (element indices shift); typing into SearchableSelect must be one uninterrupted action or onBlur closes the dropdown.
