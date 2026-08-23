@@ -99,6 +99,18 @@ Shared **`src/components/TaskItemsEditor.tsx`** drives the Tasks section on both
 - Invoices use the **same prefix + fixed-width digits scheme as jobs/quotes** — the legacy `invoiceFormat` YY#### template is retired (schema field kept but unused; `invoiceDigits Int @default(4)` added). `nextNumber`/`peek` run every key against `NumberSequence` year 0; Settings → Numbering shows the identical Prefix/Sequence Digits/Next Sequence/Live Preview row for invoices; `saveNumberingSettings` saves `invoiceDigits` + `invoiceNext`.
 - Gotcha: invoice creation from `?jobId=` errors "Select a client or a job." when the SearchableSelect job picker remounts empty — the invoice form's `jobId` hidden input can reset on key-based remount; verify by explicitly picking the job in the dropdown before submitting.
 
+## Statutory forms — Form 15 / Form 12 (2026-08-23)
+
+Master templates live in `public/uploads/form-templates/{form15,form12}.pdf` (AcroForm-fillable QLD government forms; the originals ship with SAMPLE default values in the fields — generation must clear empty fields or the sample text leaks).
+
+- **Schema**: `FormRecord` (jobId+formType unique, status draft|ready|issued, revision Int, inspectionId?, data JSON string), `FormRevision` (per generated PDF). `CompanySettings.formDefaults` = JSON string of signatory defaults (Settings → Form Defaults, `FormDefaultsForm` — overrides allowed per form).
+- **`src/lib/forms.ts`**: field defs (FORM15_SECTIONS/FORM12_SECTIONS mirroring template order), `PDF_FIELD_MAP` (editor key → AcroForm field name), `autoPopulateForm` (job site address / refNumber=jobNumber / signatory defaults; Form 12 merges suburb into the single street line), `formFileName`, `pdfDate` (dd/mm/yyyy for AcroForm date fields), `getFormDefaults`.
+- **Routes**: `/jobs/[id]/forms/[formType]` (server) → `src/components/FormEditor.tsx` (client; hidden inputs dataJson/status/inspectionId; `formAction={saveDraft|generatePdf}` bound). Job detail has a **Forms** tab (between Financial and Documents). Form 12 has a Linked Inspection dropdown auto-filling aspect + dates.
+- **`src/lib/actions/forms.ts`**: `saveFormDraft` (keeps status), `generateFormPdf` (upserts data, status→issued, fills AcroForm via pdf-lib + flatten, writes to `public/uploads/forms/job-<id>/`, revision+1 on re-issue — NEVER overwrites issued PDFs, creates `FormRevision` + `Document` (category "Forms")), `saveFormDefaults`, `deleteFormRecord` (issued forms can't be deleted).
+- **PDF serving gotcha**: `next start` does NOT serve files added to `public/` after build — generated PDFs stream through `/api/generated-forms/[...path]` (restricted to the forms dir).
+- **pdf-lib fill gotcha**: fill with `form.getTextField(name).setText(v)` inside try/catch, fall back to `getDropdown.select` — do NOT branch on `field.constructor.name` (webpack breaks it) — and always set empty values ("") to clear the template's pre-printed sample defaults.
+- **Deps**: `pdf-lib` added.
+
 ## Server/process gotchas (recurring)
 
 - Port conflicts on restart: `for p in $(ps aux | grep next-server | grep -v grep | awk '{print $2}'); do kill -9 $p; done` before `npm run start`.

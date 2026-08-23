@@ -32,6 +32,8 @@ model CompanySettings {
   invoicePrefix    String  @default("INV-")
   invoiceDigits    Int     @default(4)
   invoiceFormat    String  @default("YY####")
+  // Statutory form defaults — JSON of engineer/business signatory details (Settings → Form Defaults)
+  formDefaults     String  @default("{}")
   // Preferences
   dateFormat       String  @default("d MMM yyyy") // Australian
   timeFormat       String  @default("24h")
@@ -211,6 +213,7 @@ model Job {
   invoices       Invoice[]
   jobNotes       JobNote[]
   documents      Document[]
+  forms          FormRecord[]
   activities     Activity[]
   calendarEvents CalendarEvent[]
 }
@@ -391,4 +394,32 @@ model Activity {
   taskId    Int?
   task      Task?    @relation(fields: [taskId], references: [id])
   createdAt DateTime @default(now())
+}
+
+// ---------- Statutory forms (Form 15 / Form 12) ----------
+
+model FormRecord {
+  id           Int            @id @default(autoincrement())
+  jobId        Int
+  job          Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  formType     String         // "form15" | "form12"
+  status       String         @default("draft") // draft | ready | issued
+  revision     Int            @default(0)
+  inspectionId Int?
+  data         String         @default("{}") // JSON of every form field value
+  revisions    FormRevision[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([jobId, formType])
+}
+
+model FormRevision {
+  id        Int        @id @default(autoincrement())
+  formId    Int
+  form      FormRecord @relation(fields: [formId], references: [id], onDelete: Cascade)
+  revision  Int
+  fileName  String
+  filePath  String
+  createdAt DateTime   @default(now())
 }

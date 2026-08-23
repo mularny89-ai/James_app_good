@@ -17,7 +17,7 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-const TABS = ["Overview", "Tasks", "Inspections", "Financial", "Documents", "Notes", "Activity"] as const;
+const TABS = ["Overview", "Tasks", "Inspections", "Financial", "Forms", "Documents", "Notes", "Activity"] as const;
 
 export default async function JobDetailPage({
   params,
@@ -42,6 +42,7 @@ export default async function JobDetailPage({
       invoices: { include: { items: true, payments: true }, orderBy: { createdAt: "desc" } },
       jobNotes: true,
       documents: { orderBy: [{ category: "asc" }, { name: "asc" }, { revision: "asc" }] },
+      forms: { include: { revisions: { orderBy: { revision: "desc" } } } },
       activities: { orderBy: { createdAt: "desc" }, take: 100 },
     },
   });
@@ -353,6 +354,43 @@ export default async function JobDetailPage({
               </table>
             )}
           </div>
+        </div>
+      )}
+
+      {tab === "Forms" && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {(["form15", "form12"] as const).map((ft) => {
+            const rec = job.forms.find((f) => f.formType === ft);
+            const status = rec?.status ?? "draft";
+            const colors: Record<string, string> = { draft: "#5b6572", ready: "#b45309", issued: "#15803d" };
+            const labels: Record<string, string> = { draft: "Draft", ready: "Ready to Issue", issued: "Issued" };
+            return (
+              <div key={ft} className="card p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold">{ft === "form15" ? "Form 15" : "Form 12"}</h3>
+                  <span className="rounded-full px-2.5 py-0.5 text-xs font-bold uppercase text-white" style={{ background: colors[status] }}>
+                    {labels[status]}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-ink-muted">
+                  {ft === "form15"
+                    ? "Compliance certificate for building design or specification"
+                    : "Aspect Inspection Certificate"}
+                </p>
+                {rec && rec.revision > 0 && <p className="mt-1 text-xs text-ink-muted">Revision {rec.revision} · {rec.revisions.length} PDF{rec.revisions.length === 1 ? "" : "s"} generated</p>}
+                <div className="mt-3 flex items-center gap-3">
+                  <Link href={`/jobs/${job.id}/forms/${ft}`} className="btn-primary inline-block text-center">
+                    {rec ? "Open Form" : "Start Form"}
+                  </Link>
+                  {rec?.revisions[0] && (
+                    <a href={rec.revisions[0].filePath} target="_blank" className="link text-sm">
+                      Latest PDF (Rev {rec.revisions[0].revision})
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

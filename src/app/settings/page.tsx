@@ -4,6 +4,8 @@ import { saveCompanySettings, saveFinancialSettings, savePreferences } from "@/l
 import EmployeeManager from "@/components/EmployeeManager";
 import PresetManager from "@/components/PresetManager";
 import NumberingForm from "@/components/NumberingForm";
+import FormDefaultsForm from "@/components/FormDefaultsForm";
+import { getFormDefaults } from "@/lib/forms";
 import { PageHeader, Field } from "@/components/ui";
 import BrandingForm from "@/components/BrandingForm";
 import ConfigListEditor from "@/components/ConfigListEditor";
@@ -21,6 +23,7 @@ const TABS = [
   { key: "lists", label: "Task Lists" },
   { key: "inspections", label: "Inspection Types" },
   { key: "presets", label: "Invoice Presets" },
+  { key: "formdefaults", label: "Form Defaults" },
   { key: "financial", label: "Financial" },
   { key: "preferences", label: "Preferences" },
 ];
@@ -44,6 +47,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Rec
     nextOf("quote"),
     nextOf("invoice"),
   ]);
+
+  const formDefaults = await getFormDefaults();
 
   return (
     <div className="p-5">
@@ -101,6 +106,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Rec
         {tab === "employees" && <EmployeeManager employees={employees} />}
 
         {tab === "presets" && <PresetManager presets={presets} />}
+
+        {tab === "formdefaults" && <FormDefaultsForm defaults={formDefaults} />}
 
         {tab === "statuses" && (
           <div className="card p-5">
