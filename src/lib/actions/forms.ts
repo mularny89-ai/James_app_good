@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, StandardFonts, PDFFont } from "pdf-lib";
 import {
   FormType,
   FORM_LABEL,
@@ -75,24 +75,40 @@ export async function generateFormPdf(jobId: number, formType: FormType, fd: For
     : null;
 
   // Fill the official template's AcroForm fields, then flatten for a clean print.
-  // Empty editor values explicitly clear the template's pre-printed sample text.
+  // A single embedded Helvetica is used for every value we touch and the appearance
+  // stream is rebuilt, so preset/manual text can't smear white over the template.
   const tplPath = path.join(process.cwd(), "public", "uploads", "form-templates", TEMPLATE_FILE[formType]);
   const pdf = await PDFDocument.load(fs.readFileSync(tplPath));
+  const helvet = await pdf.embedFont(StandardFonts.Helvetica);
   const form = pdf.getForm();
+  const touched: Array<{ updateAppearances: (font: PDFFont) => void }> = [];
   for (const [key, fieldName] of Object.entries(PDF_FIELD_MAP[formType])) {
     const raw = data[key] ?? "";
     const value = DATE_KEYS.includes(key) ? pdfDate(raw) : raw;
     try {
       try {
-        form.getTextField(fieldName).setText(value);
+        const tf = form.getTextField(fieldName);
+        tf.setText(value);
+        touched.push(tf);
       } catch {
         if (value) {
           const dd = form.getDropdown(fieldName);
-          if (dd.getOptions().includes(value)) dd.select(value);
+          if (dd.getOptions().includes(value)) {
+            dd.select(value);
+            touched.push(dd);
+          }
         }
       }
     } catch {
       // Field missing in template — skip rather than fail the whole PDF.
+    }
+  }
+  // Rebuild appearance streams with the one embedded font — prevents smearing.
+  for (const f of touched) {
+    try {
+      f.updateAppearances(helvet);
+    } catch {
+      // some dropdowns disallow it; keep default appearance — fine.
     }
   }
   form.flatten();
