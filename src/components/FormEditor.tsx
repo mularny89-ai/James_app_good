@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import SignPad from "@/components/SignPad";
 import {
   FormType,
   FormData,
@@ -123,7 +124,24 @@ export default function FormEditor({
   const [data, setData] = useState<FormData>(initialData);
   const [status, setStatus] = useState(initialStatus);
   const [inspectionId, setInspectionId] = useState(initialInspectionId ? String(initialInspectionId) : "");
+  const [signing, setSigning] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const set = (k: string) => (v: string) => setData((d) => ({ ...d, [k]: v }));
+
+  const openPreview = async () => {
+    setPreviewing(true);
+    try {
+      const res = await fetch("/api/form-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formType, data }),
+      });
+      const blob = await res.blob();
+      window.open(URL.createObjectURL(blob), "_blank");
+    } finally {
+      setPreviewing(false);
+    }
+  };
 
   const pickInspection = (v: string) => {
     setInspectionId(v);
@@ -193,6 +211,36 @@ export default function FormEditor({
                   <FieldInput def={def} value={data[def.key] ?? ""} onChange={set(def.key)} />
                 </Field>
               ))}
+              {section.title.startsWith("Signatory") && (
+                <Field label="Signature" className="sm:col-span-2">
+                  {data.signature && !signing ? (
+                    <div className="flex flex-wrap items-start gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={data.signature} alt="Signature" className="max-h-24 rounded border border-line bg-white p-1" />
+                      <div className="flex gap-2">
+                        <button type="button" className="btn px-3 py-1 text-xs" onClick={() => setSigning(true)}>
+                          Re-sign
+                        </button>
+                        <button type="button" className="btn px-3 py-1 text-xs" onClick={() => set("signature")("")}>
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : signing ? (
+                    <SignPad
+                      value={data.signature ?? ""}
+                      onChange={(v) => {
+                        set("signature")(v);
+                        if (v) setSigning(false);
+                      }}
+                    />
+                  ) : (
+                    <button type="button" className="btn" onClick={() => setSigning(true)}>
+                      ✍ Sign Now
+                    </button>
+                  )}
+                </Field>
+              )}
             </div>
           </div>
         ))}
@@ -209,6 +257,9 @@ export default function FormEditor({
           </Field>
           <div className="flex gap-2">
             <Link href={`/jobs/${jobId}?tab=Forms`} className="btn">Back to Job</Link>
+            <button type="button" className="btn" onClick={openPreview} disabled={previewing}>
+              {previewing ? "Preparing…" : "Preview PDF"}
+            </button>
             <button type="submit" className="btn" formAction={saveAction}>
               Save Draft
             </button>

@@ -91,11 +91,6 @@ export const FORM15_SECTIONS: FormSectionDef[] = [
     { key: "refDocs", label: "Reference documentation", kind: "textarea" },
     { key: "refDate", label: "Date of reference documentation", kind: "date", half: true },
   ]},
-  { title: "References", fields: [
-    { key: "refNumber", label: "Reference number", kind: "text", half: true },
-    { key: "certRef", label: "Building certifier reference number", kind: "text", half: true },
-    { key: "bda", label: "Building Development Application number (in full)", kind: "text" },
-  ]},
   { title: "Signatory (engineer) details", fields: signatoryFields },
 ];
 
@@ -115,13 +110,6 @@ export const FORM12_SECTIONS: FormSectionDef[] = [
     { key: "basis", label: "Basis of certification", kind: "chips", options: CERT_CODES },
     { key: "refDocs", label: "Reference documentation", kind: "textarea" },
     { key: "refDate", label: "Date of reference documentation", kind: "date", half: true },
-  ]},
-  { title: "References", fields: [
-    { key: "refNumber", label: "Reference number", kind: "text", half: true },
-    { key: "certName", label: "Building certifier's name", kind: "text", half: true },
-    { key: "certRef", label: "Building certifier reference number", kind: "text", half: true },
-    { key: "bda", label: "Building development approval number", kind: "text", half: true },
-    { key: "requestDate", label: "Date request to inspect received from building certifier", kind: "date", half: true },
   ]},
   { title: "Signatory (engineer) details", fields: signatoryFields },
 ];
