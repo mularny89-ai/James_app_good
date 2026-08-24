@@ -24,13 +24,32 @@ export const STATUS_LABEL: Record<string, string> = {
 
 export const STATE_OPTIONS = ["QLD", "NSW", "VIC", "SA", "WA", "TAS", "NT", "ACT"];
 
+/** Standard structural codes offered for "Basis of certification" on Forms 15 & 12. */
+export const CERT_CODES = [
+  "AS1170.0: 2002",
+  "AS1170.1: 2002",
+  "AS1170.2: 2021",
+  "AS1170.4: 2024",
+  "AS1684.2: 2021",
+  "AS1720.1: 2010",
+  "AS2870: 2011",
+  "AS3600: 2018",
+  "AS3700: 2018",
+  "MP 1.4",
+];
+
+/** Codes stored as one-per-line text for the PDF; tolerates comma-separated legacy. */
+export function selectedCertCodes(v: string): string[] {
+  return v.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean);
+}
+
 export type FormData = Record<string, string>;
 
 /** Editable field definitions — one entry per editor input, in template order. */
 export type FormFieldDef = {
   key: string;
   label: string;
-  kind: "text" | "textarea" | "date" | "select";
+  kind: "text" | "textarea" | "date" | "select" | "chips";
   options?: string[];
   half?: boolean; // half-width in a 2-col grid
 };
@@ -68,7 +87,7 @@ export const FORM15_SECTIONS: FormSectionDef[] = [
   ]},
   { title: "Certification", fields: [
     { key: "aspect", label: "Description of aspect/s certified", kind: "textarea" },
-    { key: "basis", label: "Basis of certification", kind: "textarea" },
+    { key: "basis", label: "Basis of certification", kind: "chips", options: CERT_CODES },
     { key: "refDocs", label: "Reference documentation", kind: "textarea" },
     { key: "refDate", label: "Date of reference documentation", kind: "date", half: true },
   ]},
@@ -93,7 +112,7 @@ export const FORM12_SECTIONS: FormSectionDef[] = [
     { key: "extent", label: "Description of the extent of aspect/s certified", kind: "textarea" },
   ]},
   { title: "Certification", fields: [
-    { key: "basis", label: "Basis of certification", kind: "textarea" },
+    { key: "basis", label: "Basis of certification", kind: "chips", options: CERT_CODES },
     { key: "refDocs", label: "Reference documentation", kind: "textarea" },
     { key: "refDate", label: "Date of reference documentation", kind: "date", half: true },
   ]},

@@ -11,6 +11,7 @@ import {
   FORM_STATUSES,
   STATUS_LABEL,
   FormFieldDef,
+  selectedCertCodes,
 } from "@/lib/forms";
 import { Field } from "@/components/ui";
 
@@ -38,6 +39,34 @@ function FieldInput({
   value: string;
   onChange: (v: string) => void;
 }) {
+  if (def.kind === "chips") {
+    const picked = selectedCertCodes(value);
+    const toggle = (code: string) => {
+      const next = picked.includes(code) ? picked.filter((c) => c !== code) : [...picked, code];
+      onChange(next.join("\n"));
+    };
+    return (
+      <div className="flex flex-wrap gap-2">
+        {(def.options ?? []).map((code) => {
+          const active = picked.includes(code);
+          return (
+            <button
+              key={code}
+              type="button"
+              onClick={() => toggle(code)}
+              className={`rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors ${
+                active
+                  ? "border-[#34368b] bg-[#34368b] text-white"
+                  : "border-line bg-white text-ink hover:border-[#34368b] hover:text-[#34368b]"
+              }`}
+            >
+              {code}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   if (def.kind === "textarea") {
     return <textarea rows={3} className="input" value={value} onChange={(e) => onChange(e.target.value)} />;
   }
