@@ -2,6 +2,10 @@
 
 Practice-management app for **Mellan Consulting Engineers** (structural engineering consultancy, https://mellanconsulting.com.au).
 
+> **Session-specific transition state lives in `HANDOVER.md`** — dummy data,
+> latest planner overhaul details, uncommitted work. Read that first if you're
+> continuing an in-progress thread.
+
 ## Stack & Layout
 
 - Next.js 14 App Router + Prisma 5.22 (SQLite at `prisma/dev.db`) + Tailwind
@@ -88,6 +92,19 @@ Shared **`src/components/TaskItemsEditor.tsx`** drives the Tasks section on both
 ## Planner weekly-row rewrite (commit 4dc0ce3)
 
 - New `src/components/PlannerWrappedView.tsx` renders Month / 6 Weeks / 3 Months as stacked Monday–Sunday week rows (PlannerMonthView/PlannerSixWeekView/PlannerThreeMonthView); Week view keeps the horizontal timeline in PlannerBoard. Multi-week bars split with ◂▸ markers. Verified in browser across all 4 views.
+
+## Planner shared-calendar rework (2026-08-25 — uncommitted on engineering-app)
+
+Month/6W/3M render **one shared 7-col calendar grid** instead of per-job rows. Overlapping jobs are lane-stacked (`assignLanes`) inside each week strip:
+
+- Rolling week-anchored windows: Month=28, 6W=42, 3M=84 days, start = Monday of anchor week (NOT padded to calendar month). `stepAnchor()` unchanged for ‹Prev/Next›.
+- `numberOverlay()` keeps day numbers visible over bars; bars clickable underneath.
+- Month separators + alternating month shading (`stripMeta`, `stripStyle`).
+- `barLabel()` only on first segment/window-clip; continuations show arrow only.
+- Bar label indented 20–22px so it sits beside the day-number chip.
+- Wheel nav (PlannerBoard): native `wheel` listener on the grid container, always ±7 days regardless of view; 60px threshold + 500ms lock; uses Prev/Next href for filter shape.
+- Week view row label is hard-clipped (`overflow-hidden` labels + `w-full truncate` text) — no bleed into the timeline.
+- Responsive lane heights: `id="planner-wrapped-root"` measured; `laneH = clamp((vh - top - 24)/weeks - 16, MIN, MAX)`; MAX month 34 / 6w 28 / 3m 24. Font sizes bumped.
 
 ## Job name auto-derivation (2026-08-21)
 
