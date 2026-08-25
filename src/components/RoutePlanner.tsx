@@ -21,11 +21,18 @@ export type RouteStop = {
   endTime: string;
   status: string;
   color: string;
+  /** "start" | "end" marks a virtual office waypoint (not a real inspection). */
+  waypoint?: "start" | "end";
 };
 
 type StopState = RouteStop & { coord: Coord | null };
 
+// Virtual waypoint ids — negative so they never collide with inspection ids.
+const WP_START_ID = -1;
+const WP_END_ID = -2;
+
 function stopDurationMin(s: RouteStop): number {
+  if (s.waypoint) return 0; // office waypoints are pass-through
   const [h1, m1] = s.startTime.split(":").map(Number);
   const [h2, m2] = s.endTime.split(":").map(Number);
   const d = h2 * 60 + m2 - (h1 * 60 + m1);
@@ -42,8 +49,48 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
   const [geoErrors, setGeoErrors] = useState<string[]>([]);
   const [dragId, setDragId] = useState<number | null>(null);
   const [overId, setOverId] = useState<number | null>(null);
+  const [officeCoord, setOfficeCoord] = useState<Coord | null>(null);
   const [, startTransition] = useTransition();
   const geocodedRef = useRef(false);
+
+  const officeShort = officeAddress.split(",")[0] || "Office";
+
+  // Geocode the office address once so the waypoint buttons are ready instantly.
+  useEffect(() => {
+    if (!officeAddress) return;
+    geocodeStops([{ id: 0, address: officeAddress }]).then((found) => {
+      if (found.length > 0) setOfficeCoord(found[0].coord);
+    });
+  }, [officeAddress]);
+
+  function officeStop(kind: "start" | "end"): StopState {
+    return {
+      id: kind === "start" ? WP_START_ID : WP_END_ID,
+      jobNumber: "",
+      address: officeAddress,
+      clientName: "",
+      typeName: kind === "start" ? "Day start" : "Day end",
+      startTime: "00:00",
+      endTime: "00:00",
+      status: "",
+      color: "#6b7280",
+      waypoint: kind,
+      coord: officeCoord,
+    };
+  }
+
+  function addOfficeWaypoint(kind: "start" | "end") {
+    if (!officeCoord) return;
+    setStops((prev) => {
+      if (prev.some((s) => s.waypoint === kind)) return prev;
+      const stop = officeStop(kind);
+      return kind === "start" ? [stop, ...prev] : [...prev, stop];
+    });
+  }
+
+  function removeWaypoint(id: number) {
+    setStops((prev) => prev.filter((s) => s.id !== id));
+  }
 
   // Geocode every stop once on mount (cached server-side).
   useEffect(() => {
@@ -68,7 +115,9 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
     const byId = new Map(initial.map((s) => [s.id, s]));
     const added: StopState[] = [];
     setStops((prev) => {
-      const kept = prev.filter((s) => byId.has(s.id)).map((s) => ({ ...s, ...byId.get(s.id)!, coord: s.coord }));
+      const kept = prev
+        .filter((s) => s.waypoint || byId.has(s.id)) // keep office waypoints; drop deleted inspections
+        .map((s) => (s.waypoint ? s : { ...s, ...byId.get(s.id)!, coord: s.coord }));
       added.push(...initial.filter((s) => !prev.some((p) => p.id === s.id)).map((s) => ({ ...s, coord: null })));
       return [...kept, ...added];
     });
@@ -101,7 +150,15 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
     if (located.length < 3) return;
     setLoading(true);
     startTransition(async () => {
-      const order = await optimiseStopOrder(located.map((s) => ({ id: s.id, address: s.address, coord: s.coord })));
+      // Office waypoints pin the start/end of the optimised route.
+      const startWp = located.find((s) => s.waypoint === "start");
+      const endWp = located.find((s) => s.waypoint === "end");
+      const middle = located.filter((s) => s !== startWp && s !== endWp);
+      const toOptimise = [...(startWp ? [startWp] : []), ...middle, ...(endWp ? [endWp] : [])];
+      const order = await optimiseStopOrder(
+        toOptimise.map((s) => ({ id: s.id, address: s.address, coord: s.coord })),
+        Boolean(endWp),
+      );
       if (order) {
         const byId = new Map(stops.map((s) => [s.id, s]));
         const locatedOrder = order.map((id) => byId.get(id)!).filter(Boolean);
@@ -124,11 +181,14 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
     setOverId(null);
   }
 
-  // Timeline: arrival/departure per stop using scheduled time of stop 1 + traffic-adjusted
-  // travel + on-site durations. The proposed start/end times are what "Apply" writes back.
+  // Timeline: arrival/departure per stop, anchored on the first real inspection's
+  // scheduled start (office waypoints are pass-through) + traffic-adjusted travel.
+  // The proposed start/end times are what "Apply" writes back.
   const timeline = useMemo(() => {
     if (located.length === 0) return [];
-    let clock = located[0].startTime;
+    const anchor = located.find((s) => !s.waypoint);
+    let clock = anchor?.startTime ?? "08:00";
+    let seenAnchor = false;
     return located.map((s, i) => {
       const leg = i > 0 ? route?.legs[i - 1] : null;
       let legMin = 0;
@@ -139,21 +199,25 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
         legMin = leg ? leg.durationMin * mult : 20;
         clock = addMinutesToTime(clock, legMin);
       }
+      if (!s.waypoint && !seenAnchor) {
+        seenAnchor = true; // first inspection keeps its scheduled start; clock already set
+      }
       const arrive = clock;
       clock = addMinutesToTime(clock, stopDurationMin(s));
       return { id: s.id, arrive, depart: clock, leg, legMin, peak };
     });
   }, [located, route]);
 
-  // Stops whose traffic-adjusted proposed times differ from what's currently scheduled.
+  // Real inspections whose traffic-adjusted proposed times differ from what's scheduled.
   const pendingChanges = useMemo(
     () =>
       timeline
         .map((t) => {
           const s = located.find((x) => x.id === t.id)!;
-          return { id: t.id, address: s.address, jobNumber: s.jobNumber, from: `${s.startTime}–${s.endTime}`, startTime: t.arrive, endTime: t.depart };
+          return { id: t.id, address: s.address, jobNumber: s.jobNumber, from: `${s.startTime}–${s.endTime}`, startTime: t.arrive, endTime: t.depart, waypoint: s.waypoint };
         })
         .filter((p) => {
+          if (p.waypoint) return false;
           const s = located.find((x) => x.id === p.id)!;
           return s.startTime !== p.startTime || s.endTime !== p.endTime;
         }),
@@ -170,8 +234,10 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
     });
   }
 
-  const totalOnSite = located.reduce((sum, s) => sum + stopDurationMin(s), 0);
+  const totalOnSite = located.filter((s) => !s.waypoint).reduce((sum, s) => sum + stopDurationMin(s), 0);
   const totalTravelBuffered = timeline.reduce((sum, t) => sum + t.legMin, 0);
+  const hasStartWp = stops.some((s) => s.waypoint === "start");
+  const hasEndWp = stops.some((s) => s.waypoint === "end");
 
   if (initial.length === 0) {
     return (
@@ -186,10 +252,20 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
     <div className="flex h-full gap-4">
       {/* Stop list / timeline */}
       <div className="flex w-96 shrink-0 flex-col overflow-y-auto">
-        <div className="mb-2 flex items-center gap-2">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
           <button className="btn-primary" onClick={optimise} disabled={loading || located.length < 3}>
             ✨ Best Route
           </button>
+          {officeAddress && officeCoord && !hasStartWp && (
+            <button className="btn" onClick={() => addOfficeWaypoint("start")} title={`Start the day from ${officeAddress}`}>
+              + From {officeShort}
+            </button>
+          )}
+          {officeAddress && officeCoord && !hasEndWp && (
+            <button className="btn" onClick={() => addOfficeWaypoint("end")} title={`End the day at ${officeAddress}`}>
+              + To {officeShort}
+            </button>
+          )}
           {loading && <span className="text-xs text-ink-muted">Calculating…</span>}
         </div>
 
@@ -235,29 +311,43 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
                     className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
                     style={{ backgroundColor: s.color || "var(--brand-primary)" }}
                   >
-                    {i + 1}
+                    {s.waypoint ? "🏢" : i + 1}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">
-                      <Link href={`/inspections/${s.id}`} className="link">{s.jobNumber ? `${s.jobNumber} — ` : ""}{s.address || "(no address)"}</Link>
+                      {s.waypoint ? (
+                        <span>{s.address}</span>
+                      ) : (
+                        <Link href={`/inspections/${s.id}`} className="link">{s.jobNumber ? `${s.jobNumber} — ` : ""}{s.address || "(no address)"}</Link>
+                      )}
                     </div>
                     <div className="truncate text-xs text-ink-muted">
-                      {s.typeName}{s.clientName ? ` · ${s.clientName}` : ""} · {s.startTime}–{s.endTime}
+                      {s.waypoint
+                        ? (s.typeName === "Day start" ? "Day start — leave " : "Day end — back ") + (t ? (s.typeName === "Day start" ? t.depart : t.arrive) : "")
+                        : <>{s.typeName}{s.clientName ? ` · ${s.clientName}` : ""} · {s.startTime}–{s.endTime}</>}
                       {!s.coord && <span className="text-amber-600"> · not located</span>}
                     </div>
                   </div>
-                  {t && (
+                  {t && !s.waypoint && (
                     <div className="shrink-0 text-right text-xs text-ink-muted">
                       <div>arr {t.arrive}</div>
                       <div>dep {t.depart}</div>
                     </div>
+                  )}
+                  {s.waypoint && (
+                    <button
+                      className="shrink-0 text-ink-muted hover:text-red-600"
+                      onClick={() => removeWaypoint(s.id)}
+                      title="Remove waypoint"
+                    >
+                      ×
+                    </button>
                   )}
                 </div>
               </div>
             </div>
           );
         })}
-        {officeAddress && <div className="mt-1 text-xs text-ink-muted">🏢 Day starts from: {officeAddress}</div>}
 
         {route && pendingChanges.length > 0 && (
           <div className="card mt-3 border-[var(--brand-primary)] p-3">

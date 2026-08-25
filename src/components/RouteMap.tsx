@@ -6,7 +6,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Coord } from "@/lib/routing";
 
-type MapStop = { id: number; jobNumber: string; address: string; coord: Coord; color: string };
+type MapStop = { id: number; jobNumber: string; address: string; coord: Coord; color: string; waypoint?: "start" | "end" };
 
 function numberedIcon(n: number, color: string) {
   return L.divIcon({
@@ -14,6 +14,15 @@ function numberedIcon(n: number, color: string) {
     html: `<div style="background:${color || "#34368b"};color:#fff;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">${n}</div>`,
     iconSize: [26, 26],
     iconAnchor: [13, 13],
+  });
+}
+
+function officeIcon() {
+  return L.divIcon({
+    className: "",
+    html: `<div style="background:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid #6b7280;box-shadow:0 1px 4px rgba(0,0,0,.4)">🏢</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
   });
 }
 
@@ -36,9 +45,9 @@ export default function RouteMap({ stops, geometry }: { stops: MapStop[]; geomet
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       {stops.map((s, i) => (
-        <Marker key={s.id} position={[s.coord.lat, s.coord.lng]} icon={numberedIcon(i + 1, s.color)}>
+        <Marker key={s.id} position={[s.coord.lat, s.coord.lng]} icon={s.waypoint ? officeIcon() : numberedIcon(i + 1, s.color)}>
           <Popup>
-            <strong>{i + 1}. {s.jobNumber ? `${s.jobNumber} — ` : ""}{s.address}</strong>
+            <strong>{s.waypoint ? `🏢 ${s.waypoint === "start" ? "Day start" : "Day end"} — ` : `${i + 1}. ${s.jobNumber ? `${s.jobNumber} — ` : ""}`}{s.address}</strong>
           </Popup>
         </Marker>
       ))}

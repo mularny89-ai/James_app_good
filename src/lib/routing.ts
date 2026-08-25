@@ -65,11 +65,11 @@ export async function routeThrough(points: Coord[]): Promise<RouteResult | null>
 }
 
 /** Order of waypoints minimising total travel (OSRM trip solver; round=false keeps the given start fixed). */
-export async function optimiseOrder(points: Coord[]): Promise<number[] | null> {
+export async function optimiseOrder(points: Coord[], pinLast = false): Promise<number[] | null> {
   if (points.length < 3) return points.map((_, i) => i);
   const coords = points.map((p) => `${p.lng},${p.lat}`).join(";");
   try {
-    const res = await fetch(`${OSRM}/trip/v1/driving/${coords}?source=first&roundtrip=false`, {
+    const res = await fetch(`${OSRM}/trip/v1/driving/${coords}?source=first&roundtrip=false${pinLast ? "&destination=last" : ""}`, {
       signal: AbortSignal.timeout(15000),
     });
     const data = await res.json();

@@ -24,9 +24,9 @@ export async function computeRoute(stops: (StopInput & { coord: Coord })[]): Pro
   return routeThrough(stops.map((s) => s.coord));
 }
 
-/** Returns the stop ids in travel-optimised order (first stop stays fixed as the day's start). */
-export async function optimiseStopOrder(stops: (StopInput & { coord: Coord })[]): Promise<number[] | null> {
-  const order = await optimiseOrder(stops.map((s) => s.coord));
+/** Returns the stop ids in travel-optimised order (first stop stays fixed as the day's start; pinLast keeps the last stop fixed too). */
+export async function optimiseStopOrder(stops: (StopInput & { coord: Coord })[], pinLast = false): Promise<number[] | null> {
+  const order = await optimiseOrder(stops.map((s) => s.coord), pinLast);
   return order ? order.map((i) => stops[i].id) : null;
 }
 
