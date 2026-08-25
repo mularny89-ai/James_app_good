@@ -8,7 +8,7 @@ export type ClientOption = { value: string; label: string; hint?: string; noFilt
 
 const ADD_NEW = "__add_new__";
 
-/** Shared client picker: searchable existing clients + inline "＋ Add New Client"
+/** Shared client picker: searchable existing clients + inline "+ Add New Client"
  *  which saves centrally and auto-selects without a page refresh (Sections 28–33). */
 export default function ClientSelect({
   name,
@@ -34,7 +34,7 @@ export default function ClientSelect({
   const [form, setForm] = useState({ name: "", company: "", contactPerson: "", email: "", phone: "", billingAddress: "" });
 
   const allOpts = allowAddNew
-    ? [...opts, { value: ADD_NEW, label: "＋ Add New Client", hint: "", noFilter: true }]
+    ? [...opts, { value: ADD_NEW, label: "+ Add New Client", hint: "", noFilter: true }]
     : opts;
 
   const save = async () => {

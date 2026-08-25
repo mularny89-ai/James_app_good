@@ -11,7 +11,9 @@ import { presetOpts } from "@/lib/presets";
 import BrandDocument from "@/components/BrandDocument";
 import ConfirmButton from "@/components/ConfirmButton";
 import PrintButton from "@/components/PrintButton";
+import PrintOptionsPanel from "@/components/PrintOptionsPanel";
 import { quoteStatusColor } from "@/lib/constants";
+import { parsePrintOpts } from "@/lib/print-opts";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,7 @@ export default async function QuoteDetailPage({
 
   const converted = !!quote.job;
   const editable = mode === "edit" && !converted && quote.status !== "Cancelled";
+  const printOpts = parsePrintOpts(searchParams);
 
   async function updateBound(fd: FormData) {
     "use server";
@@ -139,26 +142,34 @@ export default async function QuoteDetailPage({
         </form>
       ) : (
         <>
-          <BrandDocument
-            settings={settings}
-            docType="Quotation"
-            docNumber={quote.quoteNumber}
-            date={quote.date}
-            dueOrValid={{ label: "Valid Until", value: quote.validUntil }}
-            clientName={quote.client.name}
-            clientCompany={quote.client.company}
-            billingAddress={quote.client.billingAddress}
-            siteAddress={quote.siteAddress}
-            project={quote.project}
-            scope={quote.scope}
-            items={quote.items}
-            subtotal={quote.subtotal}
-            gst={quote.gst}
-            total={quote.total}
-            gstRate={settings.gstRate}
-            notes={quote.notes}
-            exclusions={quote.exclusions}
-          />
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <BrandDocument
+                settings={settings}
+                docType="Quotation"
+                docNumber={quote.quoteNumber}
+                date={quote.date}
+                dueOrValid={{ label: "Valid Until", value: quote.validUntil }}
+                clientName={quote.client.name}
+                clientCompany={quote.client.company}
+                billingAddress={quote.client.billingAddress}
+                siteAddress={quote.siteAddress}
+                project={quote.project}
+                jobNumber={quote.job?.jobNumber}
+                opts={printOpts}
+                items={quote.items}
+                subtotal={quote.subtotal}
+                gst={quote.gst}
+                total={quote.total}
+                gstRate={settings.gstRate}
+                notes={quote.notes}
+                exclusions={quote.exclusions}
+              />
+            </div>
+            <div className="no-print">
+              <PrintOptionsPanel initial={printOpts} omit={["paymentAdvice"]} />
+            </div>
+          </div>
           {quote.activities.length > 0 && (
             <div className="no-print mx-auto mt-4 max-w-3xl card p-4">
               <h3 className="section-title mb-2">History</h3>

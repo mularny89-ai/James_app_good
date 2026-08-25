@@ -1,5 +1,6 @@
 import type { CompanySettings } from "@prisma/client";
 import { fmtDate, fmtMoney } from "@/lib/format";
+import { DEFAULT_PRINT_OPTS, type PrintOpts } from "@/lib/print-opts";
 
 /**
  * Section 91: one reusable branded document layout for quotes, invoices,
@@ -25,6 +26,9 @@ export default function BrandDocument({
   notes,
   exclusions,
   extra,
+  opts = DEFAULT_PRINT_OPTS,
+  jobNumber,
+  paymentAdvice,
 }: {
   settings: CompanySettings;
   docType: string;
@@ -45,7 +49,17 @@ export default function BrandDocument({
   notes?: string;
   exclusions?: string;
   extra?: React.ReactNode;
+  opts?: PrintOpts;
+  jobNumber?: string;
+  paymentAdvice?: string;
 }) {
+  // If item names are hidden, descriptions become the primary line text.
+  const lineParts = (it: { qty: number; unitPrice: number; amount: number }) =>
+    [
+      opts.itemQty ? `Qty ${it.qty}` : null,
+      opts.itemRate ? `Rate ${fmtMoney(it.unitPrice)}` : null,
+      opts.itemAmount ? `Amount ${fmtMoney(it.amount)}` : null,
+    ].filter((p): p is string => !!p);
   return (
     <div className="print-doc mx-auto max-w-3xl bg-white p-8 text-sm shadow-sm">
       {/* Header */}
@@ -82,13 +96,19 @@ export default function BrandDocument({
           {billingAddress && <div className="text-ink-muted">{billingAddress}</div>}
         </div>
         <div>
-          {siteAddress && (
+          {opts.siteAddress && siteAddress && (
             <>
               <div className="label">Site Address</div>
               <div className="font-medium">{siteAddress}</div>
             </>
           )}
-          {project && (
+          {opts.jobNumber && jobNumber && (
+            <>
+              <div className="label mt-2">Job No.</div>
+              <div className="font-medium">{jobNumber}</div>
+            </>
+          )}
+          {opts.description && project && (
             <>
               <div className="label mt-2">Project</div>
               <div className="font-medium">{project}</div>
@@ -97,7 +117,7 @@ export default function BrandDocument({
         </div>
       </div>
 
-      {scope && (
+      {opts.scope && scope && (
         <div className="mt-4">
           <div className="label">Scope of Works</div>
           <p className="whitespace-pre-wrap">{scope}</p>
@@ -107,21 +127,29 @@ export default function BrandDocument({
       {/* Tasks */}
       <div className="mt-4">
         <div className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--brand-primary)" }}>Tasks</div>
-        {items.map((it, i) => (
-          <div key={i} className="border-b border-line py-2">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="font-bold">{it.name || it.description}</div>
-                {it.name && it.description && (
-                  <p className="mt-0.5 whitespace-pre-wrap text-xs text-ink-muted">{it.description}</p>
+        {items.map((it, i) => {
+          const parts = lineParts(it);
+          const showName = opts.itemNames ? (it.name || it.description) : "";
+          const showDesc = opts.itemDescriptions ? it.description : "";
+          return (
+            <div key={i} className="border-b border-line py-2">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  {showName && <div className="font-bold">{showName}</div>}
+                  {showDesc && (!opts.itemNames || it.name) && (
+                    <p className={`whitespace-pre-wrap text-xs ${opts.itemNames ? "mt-0.5 text-ink-muted" : "font-bold text-ink"}`}>{showDesc}</p>
+                  )}
+                </div>
+                {parts.length > 0 && (
+                  <div className="shrink-0 text-right text-xs text-ink-muted">
+                    {parts.slice(0, -1).map((p) => <span key={p}>{p} | </span>)}
+                    <span className="font-semibold text-ink">{parts[parts.length - 1]}</span>
+                  </div>
                 )}
               </div>
-              <div className="shrink-0 text-right text-xs text-ink-muted">
-                Qty {it.qty} | Rate {fmtMoney(it.unitPrice)} | Amount <span className="font-semibold text-ink">{fmtMoney(it.amount)}</span>
-              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div className="ml-auto mt-2 w-64">
           <div className="flex justify-between px-2 py-1 text-right text-ink-muted">
             <span>Subtotal (ex GST)</span><span>{fmtMoney(subtotal)}</span>
@@ -135,19 +163,25 @@ export default function BrandDocument({
         </div>
       </div>
 
-      {exclusions && (
+      {opts.exclusions && exclusions && (
         <div className="mt-4">
           <div className="label">Exclusions</div>
           <p className="whitespace-pre-wrap text-ink-muted">{exclusions}</p>
         </div>
       )}
-      {notes && (
+      {opts.notes && notes && (
         <div className="mt-4">
           <div className="label">Notes</div>
           <p className="whitespace-pre-wrap">{notes}</p>
         </div>
       )}
       {extra}
+      {opts.paymentAdvice && paymentAdvice && (
+        <div className="mt-4 rounded border border-line bg-gray-50 px-3 py-2">
+          <div className="label">Payment Advice</div>
+          <p className="whitespace-pre-wrap text-xs">{paymentAdvice}</p>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="mt-8 border-t border-line pt-3 text-center text-xs text-ink-muted">

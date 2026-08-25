@@ -41,7 +41,7 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const DRAGGABLE = new Set(["inspection", "event"]);
 
-function EventChip({ ev, compact }: { ev: CalEvent; compact?: boolean }) {
+function EventChip({ ev, compact, clip }: { ev: CalEvent; compact?: boolean; clip?: boolean }) {
   const router = useRouter();
   const draggable = DRAGGABLE.has(ev.kind);
   const onDragStart = (e: React.DragEvent) => e.dataTransfer.setData("text/event", JSON.stringify({ id: ev.id, kind: ev.kind }));
@@ -58,7 +58,7 @@ function EventChip({ ev, compact }: { ev: CalEvent; compact?: boolean }) {
         onDragStart={onDragStart}
         onClick={() => router.push(ev.href)}
         className="cal-event"
-        style={{ backgroundColor: ev.color, color: readableTextOn(ev.color), cursor: draggable ? "grab" : "pointer" }}
+        style={{ backgroundColor: ev.color, color: readableTextOn(ev.color), cursor: draggable ? "grab" : "pointer", whiteSpace: clip ? "nowrap" : "normal", overflow: "hidden", textOverflow: "ellipsis", wordBreak: "break-word" }}
         title={`${time12} ${ev.title ?? ev.label} — ${ev.address ?? ev.sublabel}${ev.jobNumber ? ` · ${ev.jobNumber}` : ""}${ev.clientName ? ` · ${ev.clientName}` : ""}`}
       >
         {text}
@@ -157,7 +157,8 @@ export default function CalendarView({
                     {d.getDate()}
                   </span>
                 </div>
-                {evs.slice(0, 3).map((ev) => <EventChip key={`${ev.kind}${ev.id}`} ev={ev} compact />)}
+                {/* Full address wraps on quiet days; 3+ same-day events compress to one line each */}
+                {evs.slice(0, 3).map((ev) => <EventChip key={`${ev.kind}${ev.id}`} ev={ev} compact clip={evs.length > 2} />)}
                 {evs.length > 3 && (
                   <button className="text-xs text-ink-muted hover:underline" onClick={() => nav(d, "day")}>
                     +{evs.length - 3} more

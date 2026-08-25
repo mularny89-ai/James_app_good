@@ -34,6 +34,8 @@ model CompanySettings {
   invoiceFormat    String  @default("YY####")
   // Statutory form defaults — JSON of engineer/business signatory details (Settings → Form Defaults)
   formDefaults     String  @default("{}")
+  // Bank/payment details printed on invoices when "Payment Advice" is on
+  paymentAdvice    String  @default("")
   // Preferences
   dateFormat       String  @default("d MMM yyyy") // Australian
   timeFormat       String  @default("24h")

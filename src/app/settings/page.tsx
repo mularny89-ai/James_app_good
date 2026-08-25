@@ -78,6 +78,9 @@ export default async function SettingsPage({ searchParams }: { searchParams: Rec
               <Field label="Email"><input type="email" name="email" className="input" defaultValue={settings.email} /></Field>
               <Field label="Website"><input name="website" className="input" defaultValue={settings.website} /></Field>
               <Field label="Address" className="sm:col-span-2"><input name="address" className="input" defaultValue={settings.address} /></Field>
+              <Field label="Payment Advice (shown on invoices)" className="sm:col-span-2">
+                <textarea name="paymentAdvice" rows={3} className="input" defaultValue={settings.paymentAdvice} placeholder={"e.g. Bank: ANZ\nBSB: 014-002  Account: 1234 5678\nReference: Invoice number"} />
+              </Field>
             </div>
             <div className="flex justify-end border-t border-line pt-4">
               <button type="submit" className="btn-primary">Save Company Details</button>

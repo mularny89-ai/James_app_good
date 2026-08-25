@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { useFormStatus } from "react-dom";
-import SearchableSelect from "@/components/SearchableSelect";
+import AddressAutocomplete from "@/components/AddressAutocomplete";
 import ColorPicker from "@/components/ColorPicker";
 import { Field } from "@/components/ui";
 import { INSPECTION_STATUSES } from "@/lib/constants";
-import { displayJobName } from "@/lib/format";
 
 function SubmitButton({ label }: { label: string }) {
   // Disabled while the server action runs — prevents duplicate inspections.
@@ -57,48 +55,29 @@ export default function InspectionForm({
   returnTo?: string;
   submitLabel?: string;
 }) {
-  const [selectedJob, setSelectedJob] = useState<JobOpt | null>(
-    jobs.find((j) => j.id === (inspection?.jobId ?? defaultJobId)) ?? null
-  );
-
-  const linked = !!selectedJob;
+  // A linked job (via ?jobId= or when editing) is carried by a hidden input —
+  // the only address control is the autocomplete search bar.
+  const linkedJob = jobs.find((j) => j.id === (inspection?.jobId ?? defaultJobId)) ?? null;
 
   return (
     <form action={action} className="card space-y-4 p-5">
       {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
-      {/* key forces re-mount so inherited job data populates uncontrolled fields */}
-      <div className="grid gap-4 sm:grid-cols-2" key={selectedJob?.id ?? "none"}>
-        <Field label="Job / Site">
-          <SearchableSelect
-            name="jobId"
-            defaultValue={selectedJob ? String(selectedJob.id) : ""}
-            placeholder="Search job number, address or client…"
-            options={[
-              { value: "", label: "No Job / Enter Address Manually" },
-              ...jobs.map((j) => ({
-                value: String(j.id),
-                label: j.siteAddress ? `${j.jobNumber} — ${j.siteAddress}` : `${j.jobNumber} — ${displayJobName(j)}`,
-                hint: j.clientName,
-              })),
-            ]}
-            onChange={(v) => setSelectedJob(jobs.find((j) => String(j.id) === v) ?? null)}
+      {linkedJob && <input type="hidden" name="jobId" value={linkedJob.id} />}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Site Address" className="sm:col-span-2">
+          <AddressAutocomplete
+            name="siteAddress"
+            defaultValue={inspection?.siteAddress ?? linkedJob?.siteAddress ?? ""}
+            required
           />
         </Field>
+
         <Field label="Inspection Type">
           <select name="inspectionType" className="input" defaultValue={types.find((t) => t.id === inspection?.typeId)?.name ?? ""}>
             <option value="">—</option>
             {types.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
           </select>
-        </Field>
-
-        <Field label="Job Name">
-          <input name="jobName" className="input" defaultValue={inspection?.jobName ?? selectedJob?.name ?? ""} readOnly={linked} />
-        </Field>
-        <Field label="Client Name">
-          <input name="clientName" className="input" defaultValue={inspection?.clientName ?? selectedJob?.clientName ?? ""} readOnly={linked} />
-        </Field>
-        <Field label="Site Address" className="sm:col-span-2">
-          <input name="siteAddress" className="input" defaultValue={inspection?.siteAddress ?? selectedJob?.siteAddress ?? ""} readOnly={linked} required={!linked} />
         </Field>
 
         <Field label="Date *"><input type="date" name="date" className="input" defaultValue={inspection?.date ?? ""} required /></Field>
@@ -108,13 +87,13 @@ export default function InspectionForm({
         </div>
 
         <Field label="Contact Person">
-          <input name="contactPerson" className="input" defaultValue={inspection?.contactPerson ?? selectedJob?.clientContact ?? ""} />
+          <input name="contactPerson" className="input" defaultValue={inspection?.contactPerson ?? linkedJob?.clientContact ?? ""} />
         </Field>
         <Field label="Contact Phone">
-          <input name="contactPhone" className="input" defaultValue={inspection?.contactPhone ?? selectedJob?.clientPhone ?? ""} />
+          <input name="contactPhone" className="input" defaultValue={inspection?.contactPhone ?? linkedJob?.clientPhone ?? ""} />
         </Field>
         <Field label="Contact Email">
-          <input name="contactEmail" className="input" defaultValue={inspection?.contactEmail ?? selectedJob?.clientEmail ?? ""} />
+          <input name="contactEmail" className="input" defaultValue={inspection?.contactEmail ?? linkedJob?.clientEmail ?? ""} />
         </Field>
         <Field label="Status">
           <select name="status" className="input" defaultValue={inspection?.status ?? "Scheduled"}>

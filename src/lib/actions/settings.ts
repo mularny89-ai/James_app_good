@@ -18,6 +18,7 @@ export async function saveCompanySettings(fd: FormData) {
       phone: str(fd, "phone"),
       email: str(fd, "email"),
       website: str(fd, "website"),
+      paymentAdvice: str(fd, "paymentAdvice"),
     },
     create: { id: 1 },
   });

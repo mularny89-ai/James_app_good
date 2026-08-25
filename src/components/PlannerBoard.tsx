@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition, useEffect } from "react";
 import SearchableSelect from "@/components/SearchableSelect";
 import { fmtDate, displayJobName } from "@/lib/format";
@@ -127,6 +128,45 @@ export default function PlannerBoard({
   const [resizePrev, setResizePrev] = useState<{ jobId: number; endIdx: number } | null>(null);
   const [err, setErr] = useState("");
   const resizing = useRef(false);
+
+  // ----- Mouse-wheel navigation: scroll over the calendar always steps ±1 week
+  // (not by view length) so overlapping jobs at month boundaries are never skipped.
+  const router = useRouter();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const wheelAcc = useRef(0);
+  const wheelLockUntil = useRef(0);
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const weekHref = (dir: 1 | -1): string => {
+      // Use the Prev href only as a query-shape template (it carries the live
+      // filters). Anchor = the current URL's `start` (the unpadded anchor the
+      // page used), stepped by exactly 7 days regardless of view length.
+      const [path, qs] = (dir === 1 ? nav.next : nav.prev).split("?");
+      const params = new URLSearchParams(qs);
+      const current = new URLSearchParams(window.location.search).get("start") || windowStartISO;
+      const d = new Date(`${current}T00:00:00`);
+      d.setDate(d.getDate() + dir * 7);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      params.set("start", iso);
+      params.set("view", view);
+      return `${path}?${params.toString()}`;
+    };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const now = Date.now();
+      if (now < wheelLockUntil.current) return;
+      if (Math.sign(e.deltaY) !== Math.sign(wheelAcc.current)) wheelAcc.current = 0;
+      wheelAcc.current += e.deltaY;
+      if (Math.abs(wheelAcc.current) < 60) return;
+      const href = weekHref(wheelAcc.current > 0 ? 1 : -1);
+      wheelAcc.current = 0;
+      wheelLockUntil.current = now + 500;
+      router.push(href);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [nav.prev, nav.next, router, view, windowStartISO]);
 
   // ----- Rows: manual order is the source of truth; other sorts are views only -----
   const byId = useMemo(() => new Map(jobs.map((j) => [j.id, j])), [jobs]);
@@ -351,7 +391,9 @@ export default function PlannerBoard({
           <span className="rounded border border-line bg-white px-2 py-1"><b>{stats.unscheduled}</b> unscheduled</span>
         </div>
 
-        {/* Week = horizontal timeline; Month/6 Weeks/3 Months = wrapped weekly rows */}
+        {/* Week = horizontal timeline; Month/6 Weeks/3 Months = wrapped weekly rows.
+            Mouse-wheel over this area steps Prev/Next. */}
+        <div ref={gridRef}>
         {view !== "week" && (() => {
           const gridProps = {
             weeks,
@@ -443,9 +485,11 @@ export default function PlannerBoard({
                           start(async () => reorderPlanner(arr));
                         }}
                       >
-                        {/* Row label — vertical drag handle lives here */}
+                        {/* Row label — vertical drag handle lives here.
+                            overflow-hidden hard-clips the label text at the
+                            column border so it never bleeds into the timeline. */}
                         <div
-                          className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-r border-line bg-white px-2"
+                          className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 overflow-hidden border-r border-line bg-white px-2"
                           style={{ width: LABEL_W }}
                         >
                           <span
@@ -460,9 +504,9 @@ export default function PlannerBoard({
                             ⠿
                           </span>
                           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: j.color }} />
-                          <div className="min-w-0 flex-1 py-1">
+                          <div className="min-w-0 flex-1 overflow-hidden py-1">
                             <button
-                              className="link block truncate text-left text-sm font-semibold"
+                              className="link block w-full truncate text-left text-sm font-semibold"
                               onClick={() => setPopoverId(j.id)}
                               title={`${j.jobNumber} — ${j.siteAddress || displayJobName(j)}`}
                             >
@@ -571,6 +615,7 @@ export default function PlannerBoard({
           </div>
         </div>
         )}
+        </div>
       </div>
 
       {/* Unscheduled Jobs panel (Sections 31–34) */}

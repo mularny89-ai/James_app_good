@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import SearchableSelect from "@/components/SearchableSelect";
 
 export type TaskItemRow = { name: string; description: string; qty: number; unitPrice: number; gst: boolean };
@@ -52,6 +52,7 @@ function AddTaskModal({
 }) {
   const [presetId, setPresetId] = useState("");
   const preset = presets.find((p) => p.value === presetId) ?? null;
+  const taskPickerRef = useRef<HTMLDivElement>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [qty, setQty] = useState(1);
@@ -59,6 +60,7 @@ function AddTaskModal({
   const [billable, setBillable] = useState(true);
   const [optional, setOptional] = useState(false);
   const [tax1, setTax1] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const pickPreset = (v: string) => {
     setPresetId(v);
@@ -76,8 +78,8 @@ function AddTaskModal({
   const save = (addAnother: boolean) => {
     const finalName = (name || preset?.label || "").trim();
     if (!finalName) return;
-    onSave({ name: finalName, description: description.trim(), qty, unitPrice: billable ? rate : 0, gst: tax1 }, addAnother);
     if (addAnother) {
+      onSave({ name: finalName, description: description.trim(), qty, unitPrice: billable ? rate : 0, gst: tax1 }, true);
       // Reset for the next task, keeping the modal open.
       setPresetId("");
       setName("");
@@ -85,11 +87,24 @@ function AddTaskModal({
       setQty(1);
       setRate(0);
       setTax1(true);
+      return;
     }
+    // Saving (not add-another) collapses the modal to a spinner while the row is added.
+    setSaving(true);
+    onSave({ name: finalName, description: description.trim(), qty, unitPrice: billable ? rate : 0, gst: tax1 }, false);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-6" onClick={saving ? undefined : onClose}>
+      {saving ? (
+        <div className="card flex items-center gap-3 px-6 py-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <svg className="h-5 w-5 animate-spin" style={{ color: "var(--brand-primary)" }} viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+          </svg>
+          <span className="text-sm font-semibold">Saving task…</span>
+        </div>
+      ) : (
       <div className="card w-full max-w-2xl shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <h3 className="text-base font-bold">Add new task</h3>
@@ -101,14 +116,32 @@ function AddTaskModal({
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <FieldLabel>Task *</FieldLabel>
-                {/* key remounts the picker so Save & Add Another resets it */}
-                <SearchableSelect
-                  key={presetId || "empty"}
-                  name=""
-                  placeholder="Select Task"
-                  options={presets.map((p) => ({ value: p.value, label: p.label, hint: p.hint }))}
-                  onChange={pickPreset}
-                />
+                <div className="flex gap-1.5">
+                  {/* key remounts the picker so Save & Add Another resets it */}
+                  <div className="relative flex-1" ref={taskPickerRef}>
+                    <SearchableSelect
+                      key={presetId || "empty"}
+                      name=""
+                      placeholder="Select Task"
+                      options={presets.map((p) => ({ value: p.value, label: p.label, hint: p.hint }))}
+                      onChange={pickPreset}
+                    />
+                  </div>
+                  {/* Opens the task dropdown — the select has no visible affordance on its own */}
+                  <button
+                    type="button"
+                    aria-label="Open task list"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-lg font-bold leading-none text-white"
+                    style={{ backgroundColor: "#34368b" }}
+                    onClick={() => {
+                      const input = taskPickerRef.current?.querySelector<HTMLInputElement>("input:not([type=hidden])");
+                      input?.focus();
+                      input?.click();
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <FieldLabel>Task Name</FieldLabel>
@@ -188,6 +221,7 @@ function AddTaskModal({
           <button type="button" className={GREEN_BTN} onClick={() => save(true)} disabled={!ready}>Save &amp; Add Another</button>
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -213,10 +247,52 @@ export default function TaskItemsEditor({
   brandColor?: string;
 }) {
   const [rows, setRows] = useState<TaskItemRow[]>(initial.length > 0 ? initial : []);
-  const [showPreview, setShowPreview] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
+
+  const subtotal = useMemo(() => rows.reduce((s, r) => s + r.qty * r.unitPrice, 0), [rows]);
+  const gst = useMemo(() => rows.reduce((s, r) => s + (r.gst ? r.qty * r.unitPrice : 0), 0) * (gstRate / 100), [rows, gstRate]);
+
+  const readField = (n: string) => (document.querySelector(`[name="${n}"]`) as HTMLInputElement | HTMLTextAreaElement | null)?.value ?? "";
+
+  /** Renders the current form state as a real PDF and opens it in a new tab. */
+  const previewPdf = async () => {
+    setPdfBusy(true);
+    try {
+      const res = await fetch("/api/doc-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          doc: {
+            docType: documentTitle,
+            docNumber: "Preview",
+            date: new Date().toISOString(),
+            clientName: readField("clientName") || readField("contactName") || "—",
+            siteAddress: readField("siteAddress"),
+            description: readField("description") || readField("scope") || readField("project"),
+            scope: readField("scope"),
+            exclusions: readField("exclusions"),
+            items: rows.map((r) => ({ name: r.name, description: r.description, qty: r.qty, unitPrice: r.unitPrice, amount: r.qty * r.unitPrice })),
+            subtotal,
+            gst,
+            total: subtotal + gst,
+            gstRate,
+          },
+        }),
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+      window.open(url, "_blank");
+    } finally {
+      setPdfBusy(false);
+    }
+  };
 
   const set = (i: number, patch: Partial<TaskItemRow>) =>
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -224,8 +300,11 @@ export default function TaskItemsEditor({
   const addTask = (row: TaskItemRow) => setRows((rs) => [...rs, row]);
 
   const onModalSave = (row: TaskItemRow, addAnother: boolean) => {
-    addTask(row);
-    if (!addAnother) setModalOpen(false);
+    // Wait one frame so the modal can render its collapsed saving state first.
+    requestAnimationFrame(() => {
+      addTask(row);
+      if (!addAnother) setModalOpen(false);
+    });
   };
 
   const move = (i: number, dir: -1 | 1) =>
@@ -238,9 +317,6 @@ export default function TaskItemsEditor({
     });
 
   const remove = (i: number) => setRows((rs) => rs.filter((_, j) => j !== i));
-
-  const subtotal = useMemo(() => rows.reduce((s, r) => s + r.qty * r.unitPrice, 0), [rows]);
-  const gst = useMemo(() => rows.reduce((s, r) => s + (r.gst ? r.qty * r.unitPrice : 0), 0) * (gstRate / 100), [rows, gstRate]);
 
   const q = search.trim().toLowerCase();
   const visible = rows.map((r, i) => ({ r, i })).filter(({ r }) => !q || r.name.toLowerCase().includes(q) || r.description.toLowerCase().includes(q));
@@ -266,8 +342,8 @@ export default function TaskItemsEditor({
             />
           </div>
           <AddTaskButton onClick={openModal} />
-          <button type="button" className="btn" onClick={() => setShowPreview((s) => !s)}>
-            {showPreview ? "Hide Preview" : `Preview ${documentTitle}`}
+          <button type="button" className="btn" onClick={previewPdf} disabled={pdfBusy}>
+            {pdfBusy ? "Rendering…" : `Preview ${documentTitle} PDF`}
           </button>
         </div>
 
@@ -368,38 +444,6 @@ export default function TaskItemsEditor({
           </div>
         </div>
       </div>
-
-      {/* Live document preview — mirrors the issued document's TASKS section */}
-      {showPreview && (
-        <div className="mt-4 rounded-md border border-line bg-gray-50 p-4">
-          <div className="mb-2 text-xs font-bold uppercase tracking-wide text-ink-muted">Live {documentTitle} Preview</div>
-          <div className="bg-white p-4 shadow-sm">
-            <div className="text-xs font-bold uppercase tracking-wide" style={{ color: brandColor }}>Tasks</div>
-            {rows.length === 0 && <p className="mt-2 text-sm text-ink-muted">No tasks yet.</p>}
-            {rows.map((r, i) => (
-              <div key={i} className="mt-3 border-b border-line pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold">{r.name || "Untitled task"}</div>
-                    {r.description && <p className="mt-0.5 whitespace-pre-wrap text-xs text-ink-muted">{r.description}</p>}
-                  </div>
-                  <div className="shrink-0 text-right text-xs text-ink-muted">
-                    <div>Qty {r.qty} | Rate {money(r.unitPrice)} | Amount <span className="font-semibold text-ink">{money(r.qty * r.unitPrice)}</span></div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            <div className="mt-3 ml-auto w-64 text-xs">
-              <div className="flex justify-between py-0.5"><span className="text-ink-muted">Subtotal (ex GST)</span><span>{money(subtotal)}</span></div>
-              <div className="flex justify-between py-0.5"><span className="text-ink-muted">GST ({gstRate}%)</span><span>{money(gst)}</span></div>
-              <div className="flex justify-between border-t border-line py-1 text-sm font-bold" style={{ color: brandColor }}>
-                <span>Total (inc GST)</span><span>{money(subtotal + gst)}</span>
-              </div>
-            </div>
-          </div>
-          <p className="mt-2 text-xs text-ink-muted">Preview updates live as you edit. The issued document uses this same layout.</p>
-        </div>
-      )}
 
       {modalOpen && (
         <AddTaskModal presets={presets} gstRate={gstRate} onSave={onModalSave} onClose={() => setModalOpen(false)} />

@@ -8,9 +8,11 @@ import { PageHeader, SoftBadge, StatRow, Field } from "@/components/ui";
 import BrandDocument from "@/components/BrandDocument";
 import ConfirmButton from "@/components/ConfirmButton";
 import PrintButton from "@/components/PrintButton";
+import PrintOptionsPanel from "@/components/PrintOptionsPanel";
 import InvoiceForm from "@/components/InvoiceForm";
 import { presetOpts } from "@/lib/presets";
 import { invoiceStatusColor } from "@/lib/constants";
+import { parsePrintOpts } from "@/lib/print-opts";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +49,7 @@ export default async function InvoiceDetailPage({
 
   const outstanding = invoice.total - invoice.amountPaid;
   const editable = mode === "edit" && !["Paid", "Cancelled"].includes(invoice.status);
+  const printOpts = parsePrintOpts(searchParams);
 
   const jobOpts = jobs.map((j) => {
     const invoiced = j.invoices.reduce((s, i) => s + i.total / (1 + settings.gstRate / 100), 0);
@@ -132,6 +135,9 @@ export default async function InvoiceDetailPage({
               billingAddress={invoice.billingAddress}
               siteAddress={invoice.siteAddress}
               project={invoice.description}
+              jobNumber={invoice.job?.jobNumber}
+              opts={printOpts}
+              paymentAdvice={settings.paymentAdvice}
               items={invoice.items}
               subtotal={invoice.subtotal}
               gst={invoice.gst}
@@ -139,7 +145,7 @@ export default async function InvoiceDetailPage({
               gstRate={settings.gstRate}
               notes={invoice.notes}
               extra={
-                invoice.amountPaid > 0 ? (
+                printOpts.paymentAdvice && invoice.amountPaid > 0 ? (
                   <div className="mt-4 rounded border border-line bg-gray-50 px-3 py-2">
                     <span className="text-ink-muted">Paid to date:</span>{" "}
                     <strong className="text-ok">{fmtMoney(invoice.amountPaid)}</strong>
@@ -152,6 +158,7 @@ export default async function InvoiceDetailPage({
           </div>
 
           <div className="no-print space-y-4">
+            <PrintOptionsPanel initial={printOpts} omit={["scope", "exclusions"]} />
             <div className="card">
               <h3 className="section-title border-b border-line px-3 py-2">Payment Summary</h3>
               <StatRow label="Total" value={fmtMoney(invoice.total)} />

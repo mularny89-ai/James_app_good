@@ -215,17 +215,13 @@ function daysBetween(a: Date, b: Date): number {
  */
 export function viewWindow(view: PlannerView, anchor: Date): { start: Date; days: number } {
   if (view === "week") return { start: startOfMonday(anchor), days: 7 };
-  if (view === "month") {
-    const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-    const last = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
-    const s = startOfMonday(first);
-    return { start: s, days: daysBetween(s, endOfWeekSunday(last)) };
-  }
-  if (view === "6weeks") return { start: startOfMonday(anchor), days: 42 };
-  const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-  const last = new Date(anchor.getFullYear(), anchor.getMonth() + 3, 0);
-  const s = startOfMonday(first);
-  return { start: s, days: daysBetween(s, endOfWeekSunday(last)) };
+  // Month / 6 Weeks / 3 Months are all rolling weekly windows anchored to the
+  // Monday of the anchor's week — NOT padded to calendar-month boundaries.
+  // This makes mouse-wheel ±1-week stepping consistent across every view, and
+  // prevents month-boundary jobs from being skipped. The ‹ Prev / Next ›
+  // buttons still jump by view-length via stepAnchor().
+  const days = view === "month" ? 28 : view === "6weeks" ? 42 : 84;
+  return { start: startOfMonday(anchor), days };
 }
 
 /** Advance/rewind the anchor by one view-length step. */

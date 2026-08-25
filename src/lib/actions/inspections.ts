@@ -28,9 +28,9 @@ export async function createInspection(fd: FormData) {
   const insp = await db.siteInspection.create({
     data: {
       jobId: job?.id ?? null,
-      jobName: job ? job.name : str(fd, "jobName"),
-      clientName: job ? job.client.name : str(fd, "clientName"),
-      siteAddress: job ? job.siteAddress : str(fd, "siteAddress"),
+      jobName: str(fd, "jobName") || job?.name || "",
+      clientName: str(fd, "clientName") || job?.client.name || "",
+      siteAddress: str(fd, "siteAddress") || job?.siteAddress || "",
       typeId: type?.id ?? null,
       date,
       startTime: str(fd, "startTime") || "09:00",
@@ -68,9 +68,9 @@ export async function updateInspection(id: number, fd: FormData) {
     where: { id },
     data: {
       jobId: job?.id ?? null,
-      jobName: job ? job.name : str(fd, "jobName"),
-      clientName: job ? job.client.name : str(fd, "clientName"),
-      siteAddress: job ? job.siteAddress : str(fd, "siteAddress"),
+      jobName: str(fd, "jobName") || job?.name || "",
+      clientName: str(fd, "clientName") || job?.client.name || "",
+      siteAddress: str(fd, "siteAddress") || job?.siteAddress || "",
       typeId: type?.id ?? null,
       date: parseInputDate(str(fd, "date")) ?? insp.date,
       startTime: str(fd, "startTime") || insp.startTime,

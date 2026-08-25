@@ -49,22 +49,23 @@ async function main() {
   eq("duration (calendar)", durationBetween(fromIsoDay("2026-08-27"), fromIsoDay("2026-08-31"), "calendar"), 5);
 
   // ---------- Wrapped weekly-row planner views (Sections 28–32) ----------
-  // View windows are Monday-aligned whole weeks so the axis wraps into 7-column rows.
+  // All views are rolling weekly windows anchored to the Monday of the anchor's
+  // week — NOT padded to calendar-month boundaries — so mouse-wheel ±1-week
+  // stepping is consistent and month-boundary jobs are never skipped.
   const july = viewWindow("month", fromIsoDay("2026-07-15"));
-  eq("month view starts Monday 29 Jun 2026", isoDay(july.start), "2026-06-29");
-  eq("month view spans 5 weeks (35 days)", july.days, 35);
+  eq("month view starts on a Monday", july.start.getDay(), 1);
+  eq("month view is exactly 4 weeks", july.days, 28);
   eq("month window divisible into week rows", july.days % 7, 0);
   const aug = viewWindow("month", fromIsoDay("2026-08-01"));
   eq("Aug 2026 month view starts Mon 27 Jul", isoDay(aug.start), "2026-07-27");
-  // Aug 31 is a Monday, so the final week row runs through Sun 6 Sep (6 rows).
-  eq("Aug 2026 month view ends Sun 6 Sep", isoDay(addDuration(aug.start, aug.days, "calendar")), "2026-09-06");
+  eq("Aug 2026 month view ends Sun 23 Aug", isoDay(addDuration(aug.start, aug.days, "calendar")), "2026-08-23");
   const six = viewWindow("6weeks", fromIsoDay("2026-08-20"));
   eq("6-week view starts on a Monday", six.start.getDay(), 1);
   eq("6-week view is exactly 6 weeks", six.days, 42);
   eq("6-week view chunks into 6 rows", chunkWeeks(Array.from({ length: six.days })).length, 6);
   const three = viewWindow("3months", fromIsoDay("2026-07-15"));
-  eq("3-month view starts Mon 29 Jun 2026", isoDay(three.start), "2026-06-29");
-  eq("3-month view ends Sun 4 Oct 2026", isoDay(addDuration(three.start, three.days, "calendar")), "2026-10-04");
+  eq("3-month view starts on a Monday", three.start.getDay(), 1);
+  eq("3-month view is exactly 12 weeks", three.days, 84);
   eq("3-month window divisible into week rows", three.days % 7, 0);
   const wk = viewWindow("week", fromIsoDay("2026-08-20"));
   eq("week view unchanged: 7 days from Monday", wk.days, 7);
