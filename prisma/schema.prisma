@@ -425,3 +425,13 @@ model FormRevision {
   filePath  String
   createdAt DateTime   @default(now())
 }
+
+// ---------- Route planner: cached address → coordinates geocodes ----------
+
+model GeocodeCache {
+  id        Int      @id @default(autoincrement())
+  address   String   @unique // normalised lowercase address string
+  lat       Float
+  lng       Float
+  createdAt DateTime @default(now())
+}

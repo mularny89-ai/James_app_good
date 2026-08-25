@@ -31,7 +31,12 @@ export default async function InspectionsPage({ searchParams }: { searchParams: 
       <PageHeader
         title="Site Inspections"
         subtitle={`${inspections.length} inspection${inspections.length === 1 ? "" : "s"}`}
-        actions={<Link href="/inspections/new" className="btn-primary">+ Schedule Inspection</Link>}
+        actions={
+          <div className="flex gap-2">
+            <Link href="/inspections/route" className="btn">⛳ Route Planner</Link>
+            <Link href="/inspections/new" className="btn-primary">+ Schedule Inspection</Link>
+          </div>
+        }
       />
 
       <form method="GET" action="/inspections" className="mb-4 flex flex-wrap items-end gap-2">
