@@ -149,3 +149,11 @@ export async function addSubtask(parentId: number, title: string) {
   });
   revalidateTasks();
 }
+
+/** Persist a new display order for the task lists within one category (sidebar drag-and-drop). */
+export async function reorderTaskLists(orderedIds: number[]) {
+  await db.$transaction(
+    orderedIds.map((id, i) => db.taskList.update({ where: { id }, data: { order: i + 1 } })),
+  );
+  revalidateTasks();
+}

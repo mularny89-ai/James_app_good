@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import TasksView, { TaskDTO } from "@/components/TasksView";
+import TaskListsNav from "@/components/TaskListsNav";
 import { startOfDay, endOfDay } from "@/lib/format";
 import { TASK_CATEGORIES } from "@/lib/constants";
 
@@ -147,22 +148,10 @@ export default async function TasksPage({ searchParams }: { searchParams: Record
           </Link>
         ))}
 
-        {categories.map((cat) => (
-          <div key={cat.name}>
-            <div className="mt-3 px-3 pb-1 text-xs font-bold uppercase tracking-wide text-ink-muted">{cat.name}</div>
-            {cat.lists.map((l) => (
-              <Link
-                key={l.id}
-                href={`/tasks?view=list&list=${l.id}`}
-                className={`mx-2 mb-0.5 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm ${view === "list" && listId === l.id ? "font-medium text-white" : "hover:bg-gray-100"}`}
-                style={view === "list" && listId === l.id ? { backgroundColor: "var(--brand-primary)" } : undefined}
-              >
-                <span>≡</span>
-                <span className="flex-1 truncate">{l.name}</span>
-              </Link>
-            ))}
-          </div>
-        ))}
+        <TaskListsNav
+          categories={categories.map((c) => ({ name: c.name, lists: c.lists.map((l) => ({ id: l.id, name: l.name })) }))}
+          activeListId={view === "list" ? listId : null}
+        />
         <p className="mx-3 mt-2 text-xs text-ink-muted">
           Manage lists in <Link href="/settings?tab=lists" className="link">Settings</Link>.
         </p>
