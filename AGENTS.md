@@ -76,6 +76,8 @@ Visual workload scheduler/Gantt for Jobs at `/planner`:
 - Numbered fix lists — implement in place, do NOT rebuild or duplicate pages; preserve existing structure.
 - Verify changes in the browser before reporting; clean up test data afterwards.
 - Commit with Co-authored-by: openhands <openhands@all-hands.dev>; push to `engineering-app` only when asked.
+- **Commit work as soon as it's verified** — sandbox resets wipe the working tree but keep `.git`, so uncommitted work is lost silently. Never hold off committing for review. The user can always inspect commits afterward.
+- Don't trust the agent's word that things were saved — verify `git status` is clean (or explain what remains).
 
 ## Quotes/Invoices task UI rework (2026-08-21, commits 60887e7→79d262c on engineering-app)
 
