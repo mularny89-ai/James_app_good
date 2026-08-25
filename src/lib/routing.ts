@@ -100,3 +100,15 @@ export function addMinutesToTime(t: string, mins: number): string {
   const total = (((h * 60 + m + Math.round(mins)) % 1440) + 1440) % 1440;
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
+
+/**
+ * Anticipated-traffic multiplier for a leg departing at the given local time.
+ * OSRM times are free-flow; peak hours (07:00–09:29, 15:30–18:29) get a
+ * heavier loading, everything else a light buffer.
+ */
+export function trafficMultiplier(departTime: string): number {
+  const [h, m] = departTime.split(":").map(Number);
+  const mins = h * 60 + m;
+  const peak = (mins >= 420 && mins < 570) || (mins >= 930 && mins < 1110);
+  return peak ? 1.3 : 1.1;
+}

@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { geocodeStops, computeRoute, optimiseStopOrder } from "@/lib/actions/route";
-import { fmtKm, fmtMins, addMinutesToTime } from "@/lib/routing";
+import { useRouter } from "next/navigation";
+import { geocodeStops, computeRoute, optimiseStopOrder, applyRouteTimes } from "@/lib/actions/route";
+import { fmtKm, fmtMins, addMinutesToTime, trafficMultiplier } from "@/lib/routing";
 import type { Coord, RouteResult } from "@/lib/routing";
 
 // Leaflet needs the window object — load the map client-side only.
@@ -32,9 +33,12 @@ function stopDurationMin(s: RouteStop): number {
 }
 
 export default function RoutePlanner({ stops: initial, officeAddress }: { date: string; stops: RouteStop[]; officeAddress: string }) {
+  const router = useRouter();
   const [stops, setStops] = useState<StopState[]>(initial.map((s) => ({ ...s, coord: null })));
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [applied, setApplied] = useState(false);
   const [geoErrors, setGeoErrors] = useState<string[]>([]);
   const [dragId, setDragId] = useState<number | null>(null);
   const [overId, setOverId] = useState<number | null>(null);
@@ -55,6 +59,30 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
     });
   }, [initial]);
 
+  // Merge refreshed server data (e.g. after Apply) into the current order without
+  // clobbering coords or the user's drag arrangement; geocode any newly added stops.
+  const initialRef = useRef(initial);
+  useEffect(() => {
+    if (initialRef.current === initial) return;
+    initialRef.current = initial;
+    const byId = new Map(initial.map((s) => [s.id, s]));
+    const added: StopState[] = [];
+    setStops((prev) => {
+      const kept = prev.filter((s) => byId.has(s.id)).map((s) => ({ ...s, ...byId.get(s.id)!, coord: s.coord }));
+      added.push(...initial.filter((s) => !prev.some((p) => p.id === s.id)).map((s) => ({ ...s, coord: null })));
+      return [...kept, ...added];
+    });
+    if (added.length > 0) {
+      startTransition(async () => {
+        const found = await geocodeStops(added.map((s) => ({ id: s.id, address: s.address })));
+        setStops((prev) => prev.map((s) => {
+          const f = found.find((x) => x.id === s.id);
+          return f ? { ...s, coord: f.coord } : s;
+        }));
+      });
+    }
+  }, [initial]);
+
   const located = useMemo(() => stops.filter((s) => s.coord) as (StopState & { coord: Coord })[], [stops]);
 
   // Recompute the driving route whenever the located order changes.
@@ -62,6 +90,7 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
     if (located.length < 2) { setRoute(null); return; }
     let cancelled = false;
     setLoading(true);
+    setApplied(false);
     computeRoute(located.map((s) => ({ id: s.id, address: s.address, coord: s.coord }))).then((r) => {
       if (!cancelled) { setRoute(r); setLoading(false); }
     });
@@ -95,21 +124,54 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
     setOverId(null);
   }
 
-  // Timeline: arrival/departure per stop using scheduled time of stop 1 + travel + on-site durations.
+  // Timeline: arrival/departure per stop using scheduled time of stop 1 + traffic-adjusted
+  // travel + on-site durations. The proposed start/end times are what "Apply" writes back.
   const timeline = useMemo(() => {
     if (located.length === 0) return [];
     let clock = located[0].startTime;
     return located.map((s, i) => {
       const leg = i > 0 ? route?.legs[i - 1] : null;
-      if (i > 0 && leg) clock = addMinutesToTime(clock, leg.durationMin);
-      else if (i > 0) clock = addMinutesToTime(clock, 20); // fallback estimate when routing fails
+      let legMin = 0;
+      let peak = false;
+      if (i > 0) {
+        const mult = trafficMultiplier(clock); // clock = departure from previous stop
+        peak = mult > 1.1;
+        legMin = leg ? leg.durationMin * mult : 20;
+        clock = addMinutesToTime(clock, legMin);
+      }
       const arrive = clock;
       clock = addMinutesToTime(clock, stopDurationMin(s));
-      return { id: s.id, arrive, depart: clock, leg };
+      return { id: s.id, arrive, depart: clock, leg, legMin, peak };
     });
   }, [located, route]);
 
+  // Stops whose traffic-adjusted proposed times differ from what's currently scheduled.
+  const pendingChanges = useMemo(
+    () =>
+      timeline
+        .map((t) => {
+          const s = located.find((x) => x.id === t.id)!;
+          return { id: t.id, address: s.address, jobNumber: s.jobNumber, from: `${s.startTime}–${s.endTime}`, startTime: t.arrive, endTime: t.depart };
+        })
+        .filter((p) => {
+          const s = located.find((x) => x.id === p.id)!;
+          return s.startTime !== p.startTime || s.endTime !== p.endTime;
+        }),
+    [timeline, located],
+  );
+
+  function applyProposal() {
+    setApplying(true);
+    startTransition(async () => {
+      await applyRouteTimes(pendingChanges.map((p) => ({ id: p.id, startTime: p.startTime, endTime: p.endTime })));
+      setApplying(false);
+      setApplied(true);
+      router.refresh();
+    });
+  }
+
   const totalOnSite = located.reduce((sum, s) => sum + stopDurationMin(s), 0);
+  const totalTravelBuffered = timeline.reduce((sum, t) => sum + t.legMin, 0);
 
   if (initial.length === 0) {
     return (
@@ -132,10 +194,13 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
         </div>
 
         {route && (
-          <div className="card mb-2 grid grid-cols-3 gap-1 p-3 text-center">
-            <div><div className="text-xs text-ink-muted">Distance</div><div className="font-semibold">{fmtKm(route.totalDistanceKm)}</div></div>
-            <div><div className="text-xs text-ink-muted">Travel</div><div className="font-semibold">{fmtMins(route.totalDurationMin)}</div></div>
-            <div><div className="text-xs text-ink-muted">Total day</div><div className="font-semibold">{fmtMins(route.totalDurationMin + totalOnSite)}</div></div>
+          <div className="card mb-2 p-3">
+            <div className="grid grid-cols-3 gap-1 text-center">
+              <div><div className="text-xs text-ink-muted">Distance</div><div className="font-semibold">{fmtKm(route.totalDistanceKm)}</div></div>
+              <div><div className="text-xs text-ink-muted">Travel (traffic-adj.)</div><div className="font-semibold">{fmtMins(totalTravelBuffered)}</div></div>
+              <div><div className="text-xs text-ink-muted">Total day</div><div className="font-semibold">{fmtMins(totalTravelBuffered + totalOnSite)}</div></div>
+            </div>
+            <div className="mt-1 text-center text-[10px] text-ink-muted">Free-flow {fmtMins(route.totalDurationMin)} · peak-hour legs loaded ×1.3, off-peak ×1.1</div>
           </div>
         )}
 
@@ -153,7 +218,8 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
             <div key={s.id}>
               {t?.leg && (
                 <div className="ml-6 border-l-2 border-dashed border-line py-1 pl-3 text-xs text-ink-muted">
-                  🚗 {fmtKm(t.leg.distanceKm)} · {fmtMins(t.leg.durationMin)}
+                  🚗 {fmtKm(t.leg.distanceKm)} · {fmtMins(t.legMin)} in traffic
+                  {t.peak && <span className="text-amber-600"> (peak)</span>}
                 </div>
               )}
               <div
@@ -192,6 +258,28 @@ export default function RoutePlanner({ stops: initial, officeAddress }: { date: 
           );
         })}
         {officeAddress && <div className="mt-1 text-xs text-ink-muted">🏢 Day starts from: {officeAddress}</div>}
+
+        {route && pendingChanges.length > 0 && (
+          <div className="card mt-3 border-[var(--brand-primary)] p-3">
+            <div className="mb-2 text-sm font-semibold">Proposed schedule <span className="font-normal text-xs text-ink-muted">(traffic-adjusted)</span></div>
+            {pendingChanges.map((p) => (
+              <div key={p.id} className="mb-1 flex items-center justify-between gap-2 text-xs">
+                <span className="min-w-0 flex-1 truncate">{p.jobNumber ? `${p.jobNumber} — ` : ""}{p.address}</span>
+                <span className="shrink-0 text-ink-muted line-through">{p.from}</span>
+                <span className="shrink-0 font-semibold">{p.startTime}–{p.endTime}</span>
+              </div>
+            ))}
+            <button className="btn-primary mt-2 w-full" onClick={applyProposal} disabled={applying}>
+              {applying ? "Applying…" : applied ? "Applied ✓ — Apply again" : `Apply proposed times to ${pendingChanges.length} inspection${pendingChanges.length === 1 ? "" : "s"}`}
+            </button>
+            <div className="mt-1 text-[10px] text-ink-muted">Updates the confirmed start/end times on each inspection and logs the change.</div>
+          </div>
+        )}
+        {route && pendingChanges.length === 0 && located.length > 1 && (
+          <div className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 p-2 text-xs text-emerald-800">
+            ✓ Scheduled times already match the traffic-adjusted best schedule.
+          </div>
+        )}
       </div>
 
       {/* Map */}
