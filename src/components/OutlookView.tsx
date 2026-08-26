@@ -78,6 +78,7 @@ export default function OutlookView({ account }: { account: string }) {
   const [query, setQuery] = useState("");
   const [activeQuery, setActiveQuery] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [viewFilter, setViewFilter] = useState<"" | "attachments" | "clients" | "flagged">("");
   const [selected, setSelected] = useState<FullMessage | null>(null);
   const [loadingMsg, setLoadingMsg] = useState(false);
   const [compose, setCompose] = useState<ComposeState>(null);
@@ -182,6 +183,24 @@ export default function OutlookView({ account }: { account: string }) {
       body: JSON.stringify({ isRead }),
     });
     loadFolders();
+  };
+
+  const createTask = async (m: FullMessage) => {
+    const res = await fetch("/api/email/to-task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subject: m.subject,
+        from: m.from,
+        fromEmail: m.fromEmail,
+        preview: m.preview,
+        jobId: m.jobs[0]?.id,
+        clientId: m.client?.id,
+      }),
+    });
+    const data = await res.json();
+    if (res.ok) flash(`Task created in "${data.list}" ✓`);
+    else setError(data.error || "Could not create task.");
   };
 
   const startCompose = (mode: NonNullable<ComposeState>["mode"], m?: FullMessage) => {
@@ -298,6 +317,17 @@ export default function OutlookView({ account }: { account: string }) {
         >
           Unread
         </button>
+        {(["attachments", "clients", "flagged"] as const).map((v) => (
+          <button
+            key={v}
+            className={`btn ${viewFilter === v ? "font-bold" : ""}`}
+            style={viewFilter === v ? { borderColor: "var(--brand-primary)", color: "var(--brand-primary)" } : undefined}
+            onClick={() => setViewFilter((f) => (f === v ? "" : v))}
+            title={v === "attachments" ? "Only emails with attachments" : v === "clients" ? "Only emails from known clients" : "Only flagged emails"}
+          >
+            {v === "attachments" ? "📎" : v === "clients" ? "👤" : "⚑"}
+          </button>
+        ))}
         {notice && <span className="text-sm text-ok">{notice}</span>}
         {error && <span className="text-sm text-err">{error}</span>}
       </div>
@@ -326,7 +356,10 @@ export default function OutlookView({ account }: { account: string }) {
               Search results for "{activeQuery}" — all folders
             </div>
           )}
-          {messages.filter((m) => !unreadOnly || !m.isRead).map((m) => (
+          {messages
+            .filter((m) => !unreadOnly || !m.isRead)
+            .filter((m) => !viewFilter || (viewFilter === "attachments" ? m.hasAttachments : viewFilter === "clients" ? Boolean(m.client) : m.flagged))
+            .map((m) => (
             <button
               key={m.id}
               onClick={() => openMessage(m)}
@@ -447,6 +480,7 @@ export default function OutlookView({ account }: { account: string }) {
                     >
                       {selected.isRead ? "✉" : "✉✓"}
                     </button>
+                    <button className="btn px-2 py-1 text-xs" title="Create a follow-up task from this email" onClick={() => createTask(selected)}>✓ Task</button>
                     <button className="btn px-2 py-1 text-xs text-err" onClick={() => deleteMessage(selected)}>🗑</button>
                   </div>
                 </div>

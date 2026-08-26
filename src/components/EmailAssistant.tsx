@@ -7,10 +7,11 @@ export type DraftPayload = { to: string; subject: string; body: string };
 type Msg = { role: "user" | "assistant"; content: string };
 
 const SUGGESTIONS = [
+  "Triage my unread inbox: what needs a reply, what's FYI, what's noise?",
   "Summarise my unread emails from today",
   "Find the email about 32 Cumberland Drive and tell me what they need",
+  "Which clients are waiting on a response from me?",
   "Draft a reply to the latest email from a client about engineering drawings",
-  "What jobs are waiting on client responses?",
 ];
 
 export default function EmailAssistant({ onDraft }: { onDraft: (d: DraftPayload) => void }) {

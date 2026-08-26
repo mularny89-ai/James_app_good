@@ -191,7 +191,7 @@ const OLLAMA_TOOLS = TOOL_DEFS.map((t) => ({
 
 async function runOllama(message: string, history: any[]) {
   const base = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-  const model = process.env.OLLAMA_MODEL || "qwen2.5:3b";
+  const model = process.env.OLLAMA_MODEL || "qwen2.5:1.5b";
   const messages: any[] = [
     { role: "system", content: SYSTEM },
     ...history.slice(-10),
