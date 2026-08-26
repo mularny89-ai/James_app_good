@@ -78,19 +78,21 @@ export default async function EmailPage({ searchParams }: { searchParams: Record
         </div>
       </div>
 
-      {!configured && !connected && (
+      {!connected && (
         <div className="card mb-4 p-4">
-          <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-muted">One-time setup: paste your client secret</h2>
+          <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-muted">
+            {configured ? "Update client secret" : "One-time setup: paste your client secret"}
+          </h2>
           <form action="/api/email/config" method="POST" className="flex flex-wrap items-end gap-2">
             <div className="min-w-72 flex-1">
-              <label className="label">Client secret (the "Value" from Certificates &amp; secrets)</label>
+              <label className="label">Client secret (the "Value" column, NOT "Secret ID")</label>
               <input name="secret" type="password" className="input w-full" placeholder="e.g. aBc1~xYz..." required />
             </div>
             <button type="submit" className="btn-primary">Save</button>
           </form>
           <p className="mt-2 text-xs text-ink-muted">
-            Stored in the app database, never shown again. Azure app: Mellan Practice Manager
-            (client ID eedcf15a-…3275 is already configured).
+            Stored in the app database, never shown again. Saving a new value replaces the old one.
+            Azure app: Mellan Practice Manager (client ID eedcf15a-…3275 is already configured).
           </p>
         </div>
       )}
