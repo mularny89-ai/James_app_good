@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import { db } from "@/lib/db";
 import { fmtDate, isOverdue, displayJobName } from "@/lib/format";
 import { PageHeader, EmptyState, SoftBadge } from "@/components/ui";
@@ -17,6 +18,7 @@ export default async function JobsPage({
   const typeFilter = searchParams.type ?? "";
   const clientFilter = searchParams.client ?? "";
   const priorityFilter = searchParams.priority ?? "";
+  const yearFilter = searchParams.year ?? "";
   const awaiting = searchParams.awaiting === "1";
 
   const statuses = await db.jobStatus.findMany({ orderBy: { order: "asc" } });
@@ -29,6 +31,10 @@ export default async function JobsPage({
   if (typeFilter) where.projectType = { name: typeFilter };
   if (priorityFilter) where.priority = priorityFilter;
   if (clientFilter) where.clientId = parseInt(clientFilter);
+  if (yearFilter) {
+    const y = parseInt(yearFilter);
+    where.createdAt = { gte: new Date(y, 0, 1), lt: new Date(y + 1, 0, 1) };
+  }
 
   const jobs = await db.job.findMany({
     where,
@@ -40,6 +46,18 @@ export default async function JobsPage({
     },
     orderBy: [{ createdAt: "desc" }],
   });
+
+  // Distinct job years for the Year filter (created year == number-prefix year: J55…=2025, J66…=2026)
+  const allDates = await db.job.findMany({ where: { archived: false }, select: { createdAt: true } });
+  const years = Array.from(new Set(allDates.map((j) => j.createdAt.getFullYear()))).sort((a, b) => b - a);
+
+  // List view groups jobs under year headings, newest year first.
+  const jobsByYear = new Map<number, typeof jobs>();
+  for (const j of [...jobs].sort((a, b) => b.jobNumber.localeCompare(a.jobNumber, undefined, { numeric: true }))) {
+    const y = j.createdAt.getFullYear();
+    if (!jobsByYear.has(y)) jobsByYear.set(y, []);
+    jobsByYear.get(y)!.push(j);
+  }
 
   const boardColumns = statuses.filter((s) => s.isBoardColumn).sort((a, b) => a.boardOrder - b.boardOrder);
   const kanbanData = boardColumns.map((col) => ({
@@ -63,7 +81,7 @@ export default async function JobsPage({
 
   const qs = (patch: Record<string, string>) => {
     const p = new URLSearchParams();
-    const merged = { view, status: statusFilter, type: typeFilter, client: clientFilter, priority: priorityFilter, ...(awaiting ? { awaiting: "1" } : {}), ...patch };
+    const merged = { view, status: statusFilter, type: typeFilter, client: clientFilter, priority: priorityFilter, year: yearFilter, ...(awaiting ? { awaiting: "1" } : {}), ...patch };
     Object.entries(merged).forEach(([k, v]) => v && p.set(k, v));
     return `/jobs?${p.toString()}`;
   };
@@ -113,6 +131,13 @@ export default async function JobsPage({
             {["Low", "Normal", "High", "Urgent"].map((p) => <option key={p}>{p}</option>)}
           </select>
         </div>
+        <div>
+          <label className="label">Year</label>
+          <select name="year" defaultValue={yearFilter} className="input w-28">
+            <option value="">All years</option>
+            {years.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
         <button className="btn" type="submit">Apply</button>
         <Link href={`/jobs?view=${view}`} className="btn">Clear</Link>
       </form>
@@ -144,24 +169,36 @@ export default async function JobsPage({
               </tr>
             </thead>
             <tbody>
-              {jobs.map((j) => (
-                <tr key={j.id} className="border-b border-line hover:bg-gray-50">
-                  <td className="td font-bold">
-                    <Link href={`/jobs/${j.id}`} className="link">{j.jobNumber}</Link>
-                  </td>
-                  <td className="td max-w-64 truncate">
-                    <Link href={`/jobs/${j.id}`} className="link">{displayJobName(j)}</Link>
-                    {j.siteAddress && <div className="truncate text-xs text-ink-muted">{j.siteAddress}</div>}
-                  </td>
-                  <td className="td">
-                    <Link href={`/clients/${j.clientId}`} className="link">{j.client.name}</Link>
-                  </td>
-                  <td className="td text-ink-muted">{j.projectType?.name ?? "—"}</td>
-                  <td className="td"><SoftBadge label={j.status.name} color={j.status.color} /></td>
-                  <td className="td" style={{ color: priorityColor(j.priority) }}>{j.priority}</td>
-                  <td className={`td ${isOverdue(j.dueDate) ? "font-semibold text-err" : ""}`}>{fmtDate(j.dueDate)}</td>
-                  <td className="td text-ink-muted">{j._count.tasks}</td>
-                </tr>
+              {Array.from(jobsByYear.entries()).map(([year, yearJobs]) => (
+                <Fragment key={year}>
+                  <tr className="border-b border-line bg-indigo-50/60">
+                    <td colSpan={8} className="td py-1.5">
+                      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--brand-primary)" }}>
+                        {year}
+                      </span>
+                      <span className="ml-2 text-xs text-ink-muted">{yearJobs.length} job{yearJobs.length === 1 ? "" : "s"}</span>
+                    </td>
+                  </tr>
+                  {yearJobs.map((j) => (
+                    <tr key={j.id} className="border-b border-line hover:bg-gray-50">
+                      <td className="td font-bold">
+                        <Link href={`/jobs/${j.id}`} className="link">{j.jobNumber}</Link>
+                      </td>
+                      <td className="td max-w-64 truncate">
+                        <Link href={`/jobs/${j.id}`} className="link">{displayJobName(j)}</Link>
+                        {j.siteAddress && <div className="truncate text-xs text-ink-muted">{j.siteAddress}</div>}
+                      </td>
+                      <td className="td">
+                        <Link href={`/clients/${j.clientId}`} className="link">{j.client.name}</Link>
+                      </td>
+                      <td className="td text-ink-muted">{j.projectType?.name ?? "—"}</td>
+                      <td className="td"><SoftBadge label={j.status.name} color={j.status.color} /></td>
+                      <td className="td" style={{ color: priorityColor(j.priority) }}>{j.priority}</td>
+                      <td className={`td ${isOverdue(j.dueDate) ? "font-semibold text-err" : ""}`}>{fmtDate(j.dueDate)}</td>
+                      <td className="td text-ink-muted">{j._count.tasks}</td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
