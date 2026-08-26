@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui";
 import EmailComposer, { type EmailJobOpt } from "@/components/EmailComposer";
-import InboxPanel from "@/components/InboxPanel";
+import OutlookView from "@/components/OutlookView";
 import { msalConnection, msalConfigured } from "@/lib/msal";
 
 export const dynamic = "force-dynamic";
@@ -97,7 +97,7 @@ export default async function EmailPage({ searchParams }: { searchParams: Record
         </div>
       )}
 
-      <InboxPanel connected={connected} account={account} />
+      {connected && <OutlookView account={account} />}
 
       <div className="mt-4">
         <EmailComposer jobs={jobs} connected={connected} />

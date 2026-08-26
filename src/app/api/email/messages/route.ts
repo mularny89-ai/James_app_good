@@ -1,20 +1,48 @@
 import { NextResponse } from "next/server";
 import { graphRequest } from "@/lib/msal";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/email/messages?q=search — inbox messages with client/job matching
+const LIST_SELECT = "id,subject,from,receivedDateTime,bodyPreview,isRead,hasAttachments,flag,conversationId";
+const DETAIL_SELECT =
+  "id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,isRead,hasAttachments,internetMessageId";
+
+function notConnected(e: any) {
+  return e?.message === "NOT_CONNECTED";
+}
+
+function mapListMessage(m: any) {
+  return {
+    id: m.id,
+    subject: m.subject || "(no subject)",
+    from: m.from?.emailAddress?.name || m.from?.emailAddress?.address || "",
+    fromEmail: m.from?.emailAddress?.address || "",
+    receivedAt: m.receivedDateTime,
+    preview: m.bodyPreview || "",
+    isRead: m.isRead,
+    hasAttachments: m.hasAttachments,
+    flagged: m.flag?.flagStatus === "flagged",
+  };
+}
+
+// GET /api/email/messages?folder=<id>&q=&cursor=<skip>
 export async function GET(req: Request) {
-  const q = new URL(req.url).searchParams.get("q")?.trim() ?? "";
-  const graphPath = q
-    ? `/me/messages?$search=${encodeURIComponent(`"${q}"`)}&$top=30&$select=id,subject,from,receivedDateTime,bodyPreview,isRead,body,internetMessageId&$orderby=receivedDateTime desc`
-    : `/me/mailFolders/inbox/messages?$top=30&$select=id,subject,from,receivedDateTime,bodyPreview,isRead,body,internetMessageId&$orderby=receivedDateTime desc`;
+  const sp = new URL(req.url).searchParams;
+  const q = sp.get("q")?.trim() ?? "";
+  const folder = sp.get("folder") ?? "inbox";
+  const skip = parseInt(sp.get("skip") ?? "0") || 0;
+  const full = sp.get("full") === "1";
+
+  const path = q
+    ? `/me/messages?$search=${encodeURIComponent(`"${q}"`)}&$top=30&$select=${full ? DETAIL_SELECT : LIST_SELECT}`
+    : `/me/mailFolders/${encodeURIComponent(folder)}/messages?$top=30&$skip=${skip}&$select=${full ? DETAIL_SELECT : LIST_SELECT}&$orderby=receivedDateTime desc`;
 
   let res: Response;
   try {
-    res = await graphRequest(graphPath);
+    res = await graphRequest(path);
   } catch (e: any) {
-    if (e.message === "NOT_CONNECTED") return NextResponse.json({ error: "not_connected" }, { status: 401 });
+    if (notConnected(e)) return NextResponse.json({ error: "not_connected" }, { status: 401 });
     throw e;
   }
   if (!res.ok) {
@@ -22,15 +50,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: `graph_${res.status}`, detail: detail.slice(0, 300) }, { status: res.status });
   }
   const data = await res.json();
-  const messages: any[] = data.value ?? [];
+  const raw: any[] = data.value ?? [];
 
-  // Match senders to clients; clients to active jobs.
-  const emails = messages
-    .map((m) => m.from?.emailAddress?.address?.toLowerCase())
-    .filter((e): e is string => Boolean(e));
+  // Match senders to clients + active jobs for context links.
+  const emails = raw.map((m) => m.from?.emailAddress?.address?.toLowerCase()).filter((e): e is string => Boolean(e));
   const clients = emails.length
-    ? await (await import("@/lib/db")).db.client.findMany({
-        where: { email: { in: emails }, archived: false },
+    ? await db.client.findMany({
+        where: { email: { in: Array.from(new Set(emails)) }, archived: false },
         include: {
           jobs: {
             where: { archived: false, status: { name: { notIn: ["Completed", "Cancelled"] } } },
@@ -43,22 +69,22 @@ export async function GET(req: Request) {
   const byEmail = new Map(clients.map((c) => [c.email.toLowerCase(), c]));
 
   return NextResponse.json({
-    messages: messages.map((m) => {
-      const fromEmail = m.from?.emailAddress?.address?.toLowerCase() ?? "";
-      const client = byEmail.get(fromEmail);
-      return {
-        id: m.id,
-        subject: m.subject || "(no subject)",
-        from: m.from?.emailAddress?.name || fromEmail,
-        fromEmail,
-        receivedAt: m.receivedDateTime,
-        preview: m.bodyPreview || "",
-        isRead: m.isRead,
-        bodyText: m.body?.contentType === "text" ? m.body.content : (m.body?.content || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
-        internetMessageId: m.internetMessageId ?? "",
+    messages: raw.map((m) => {
+      const base = mapListMessage(m);
+      const client = byEmail.get(base.fromEmail.toLowerCase());
+      const out: any = {
+        ...base,
         client: client ? { id: client.id, name: client.name } : null,
         jobs: (client?.jobs ?? []).map((j) => ({ id: j.id, jobNumber: j.jobNumber, site: j.siteAddress || "" })),
       };
+      if (full) {
+        out.to = (m.toRecipients ?? []).map((r: any) => r.emailAddress?.address || "").join(", ");
+        out.cc = (m.ccRecipients ?? []).map((r: any) => r.emailAddress?.address || "").join(", ");
+        out.bodyHtml = m.body?.contentType === "html" ? m.body.content : "";
+        out.bodyText = m.body?.contentType === "text" ? m.body.content : (m.body?.content || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      }
+      return out;
     }),
+    hasMore: raw.length === 30,
   });
 }
