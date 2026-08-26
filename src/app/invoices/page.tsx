@@ -11,13 +11,14 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Rec
   await refreshOverdueInvoices();
   const status = searchParams.status ?? "";
   const clientFilter = searchParams.client ?? "";
+  const sortOrder = searchParams.sort === "asc" ? "asc" : "desc";
 
   const where: any = { archived: false };
   if (status === "outstanding") where.status = { in: ["Sent", "Part Paid", "Overdue"] };
   else if (status) where.status = status;
   if (clientFilter) where.clientId = parseInt(clientFilter);
 
-  const [invoices, clients] = await Promise.all([
+  const [invoicesRaw, clients] = await Promise.all([
     db.invoice.findMany({
       where,
       include: { client: true, job: true },
@@ -26,6 +27,18 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Rec
     }),
     db.client.findMany({ where: { archived: false }, orderBy: { name: "asc" } }),
   ]);
+  const invoices = [...invoicesRaw].sort((a, b) =>
+    sortOrder === "asc"
+      ? a.invoiceNumber.localeCompare(b.invoiceNumber, undefined, { numeric: true })
+      : b.invoiceNumber.localeCompare(a.invoiceNumber, undefined, { numeric: true }),
+  );
+
+  const qs = (patch: Record<string, string>) => {
+    const p = new URLSearchParams();
+    const merged = { status, client: clientFilter, sort: sortOrder === "asc" ? "asc" : "", ...patch };
+    Object.entries(merged).forEach(([k, v]) => v && p.set(k, v));
+    return `/invoices?${p.toString()}`;
+  };
 
   const outstandingTotal = invoices.reduce((s, i) => s + (i.total - i.amountPaid), 0);
 
@@ -38,6 +51,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Rec
       />
 
       <form method="GET" action="/invoices" className="mb-4 flex flex-wrap items-end gap-2">
+        {sortOrder === "asc" && <input type="hidden" name="sort" value="asc" />}
         <div>
           <label className="label">Status</label>
           <select name="status" defaultValue={status} className="input w-40">
@@ -64,7 +78,11 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Rec
           <table className="w-full">
             <thead className="sticky top-0 bg-gray-50">
               <tr className="border-b border-line">
-                <th className="th">Invoice №</th>
+                <th className="th">
+                  <Link href={qs({ sort: sortOrder === "asc" ? "" : "asc" })} className="link" title="Sort by invoice number">
+                    Invoice № {sortOrder === "asc" ? "▲" : "▼"}
+                  </Link>
+                </th>
                 <th className="th">Date</th>
                 <th className="th">Client</th>
                 <th className="th">Job</th>

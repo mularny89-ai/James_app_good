@@ -9,12 +9,13 @@ export const dynamic = "force-dynamic";
 export default async function QuotesPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const status = searchParams.status ?? "";
   const clientFilter = searchParams.client ?? "";
+  const sortOrder = searchParams.sort === "asc" ? "asc" : "desc";
 
   const where: any = { archived: false };
   if (status) where.status = status;
   if (clientFilter) where.clientId = parseInt(clientFilter);
 
-  const [quotes, clients] = await Promise.all([
+  const [quotesRaw, clients] = await Promise.all([
     db.quote.findMany({
       where,
       include: { client: true, job: true },
@@ -23,6 +24,18 @@ export default async function QuotesPage({ searchParams }: { searchParams: Recor
     }),
     db.client.findMany({ where: { archived: false }, orderBy: { name: "asc" } }),
   ]);
+  const quotes = [...quotesRaw].sort((a, b) =>
+    sortOrder === "asc"
+      ? a.quoteNumber.localeCompare(b.quoteNumber, undefined, { numeric: true })
+      : b.quoteNumber.localeCompare(a.quoteNumber, undefined, { numeric: true }),
+  );
+
+  const qs = (patch: Record<string, string>) => {
+    const p = new URLSearchParams();
+    const merged = { status, client: clientFilter, sort: sortOrder === "asc" ? "asc" : "", ...patch };
+    Object.entries(merged).forEach(([k, v]) => v && p.set(k, v));
+    return `/quotes?${p.toString()}`;
+  };
 
   return (
     <div className="p-5">
@@ -33,6 +46,7 @@ export default async function QuotesPage({ searchParams }: { searchParams: Recor
       />
 
       <form method="GET" action="/quotes" className="mb-4 flex flex-wrap items-end gap-2">
+        {sortOrder === "asc" && <input type="hidden" name="sort" value="asc" />}
         <div>
           <label className="label">Status</label>
           <select name="status" defaultValue={status} className="input w-40">
@@ -58,7 +72,11 @@ export default async function QuotesPage({ searchParams }: { searchParams: Recor
           <table className="w-full">
             <thead className="sticky top-0 bg-gray-50">
               <tr className="border-b border-line">
-                <th className="th">Quote №</th>
+                <th className="th">
+                  <Link href={qs({ sort: sortOrder === "asc" ? "" : "asc" })} className="link" title="Sort by quote number">
+                    Quote № {sortOrder === "asc" ? "▲" : "▼"}
+                  </Link>
+                </th>
                 <th className="th">Date</th>
                 <th className="th">Client</th>
                 <th className="th">Project / Site</th>
