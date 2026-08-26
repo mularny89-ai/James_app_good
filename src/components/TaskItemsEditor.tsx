@@ -76,7 +76,11 @@ function AddTaskModal({
 
   const save = (addAnother: boolean) => {
     const finalName = (name || preset?.label || "").trim();
-    if (!finalName) return;
+    // Blank form on plain Save (e.g. after Save & Add Another) = done, just close.
+    if (!finalName) {
+      if (!addAnother) onClose();
+      return;
+    }
     if (addAnother) {
       onSave({ name: finalName, description: description.trim(), qty, unitPrice: billable ? rate : 0, gst: tax1 }, true);
       // Reset for the next task, keeping the modal open.
@@ -213,7 +217,8 @@ function AddTaskModal({
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-line px-4 py-3">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button type="button" className={GREEN_BTN} onClick={() => save(false)} disabled={!ready}>Save</button>
+          {/* Plain Save is never disabled: on a blank form it just closes the modal. */}
+          <button type="button" className={GREEN_BTN} onClick={() => save(false)}>Save</button>
           <button type="button" className={GREEN_BTN} onClick={() => save(true)} disabled={!ready}>Save &amp; Add Another</button>
         </div>
       </div>
