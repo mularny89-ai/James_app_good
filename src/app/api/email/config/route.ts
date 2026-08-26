@@ -8,8 +8,10 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const form = await req.formData();
   const secret = form.get("secret");
+  const aiKey = form.get("aiKey");
   const data: Record<string, string> = {};
   if (typeof secret === "string" && secret.trim()) data.msalClientSecret = secret.trim();
+  if (typeof aiKey === "string" && aiKey.trim()) data.aiApiKey = aiKey.trim();
   if (!Object.keys(data).length) {
     return NextResponse.json({ error: "Nothing to save." }, { status: 400 });
   }

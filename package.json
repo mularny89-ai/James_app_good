@@ -12,6 +12,7 @@
     "test": "node tests/run.cjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
     "@azure/msal-node": "^5.6.0",
     "@prisma/client": "5.22.0",
     "@types/leaflet": "^1.9.22",

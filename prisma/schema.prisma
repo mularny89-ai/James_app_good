@@ -46,6 +46,8 @@ model CompanySettings {
   msalTenantId    String @default("3a228346-9ee3-4dbb-a8da-3a06fc8d550d")
   // Azure app client secret — set via the Email page; env MSAL_CLIENT_SECRET takes precedence
   msalClientSecret String @default("")
+  // Anthropic API key for the email AI assistant — set via the Email page; env ANTHROPIC_API_KEY takes precedence
+  aiApiKey String @default("")
   // Preferences
   dateFormat       String  @default("d MMM yyyy") // Australian
   timeFormat       String  @default("24h")
