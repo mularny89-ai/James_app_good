@@ -19,6 +19,7 @@ export default function EmailAssistant({ onDraft }: { onDraft: (d: DraftPayload)
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [model, setModel] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,14 +41,8 @@ export default function EmailAssistant({ onDraft }: { onDraft: (d: DraftPayload)
         body: JSON.stringify({ message: content, history: msgs }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        if (data.error === "no_ai_key") {
-          setError("no_ai_key");
-          setMsgs(next.slice(0, -1));
-          return;
-        }
-        throw new Error(data.error || "Assistant failed.");
-      }
+      if (!res.ok) throw new Error(data.error || "Assistant failed.");
+      if (data.model) setModel(data.model);
       setMsgs([...next, { role: "assistant", content: data.reply }]);
       if (data.draft) onDraft(data.draft);
     } catch (e: any) {
@@ -74,7 +69,10 @@ export default function EmailAssistant({ onDraft }: { onDraft: (d: DraftPayload)
   return (
     <div className="fixed bottom-6 right-6 z-50 flex h-[560px] w-[400px] flex-col overflow-hidden rounded-lg border border-line bg-white shadow-2xl">
       <div className="flex items-center justify-between px-3 py-2 text-white" style={{ backgroundColor: "var(--brand-primary)" }}>
-        <div className="text-sm font-semibold">✨ Email Assistant</div>
+        <div className="text-sm font-semibold">
+          ✨ Email Assistant
+          {model && <span className="ml-2 text-[10px] font-normal text-white/70">{model}</span>}
+        </div>
         <button onClick={() => setOpen(false)} className="px-1 text-white/80 hover:text-white">✕</button>
       </div>
 
@@ -111,19 +109,7 @@ export default function EmailAssistant({ onDraft }: { onDraft: (d: DraftPayload)
         <div ref={endRef} />
       </div>
 
-      {error === "no_ai_key" ? (
-        <div className="border-t border-line p-3">
-          <p className="mb-2 text-xs text-ink-muted">
-            The assistant needs an Anthropic API key (from console.anthropic.com). Paste it once — it saves to the app:
-          </p>
-          <form action="/api/email/config" method="POST" className="flex gap-2">
-            <input name="aiKey" type="password" className="input flex-1" placeholder="sk-ant-..." required />
-            <button type="submit" className="btn-primary px-3">Save</button>
-          </form>
-        </div>
-      ) : (
-        error && <div className="border-t border-line px-3 py-1.5 text-xs text-err">{error}</div>
-      )}
+      {error && <div className="border-t border-line px-3 py-1.5 text-xs text-err">{error}</div>}
 
       <div className="flex gap-2 border-t border-line p-2">
         <input
