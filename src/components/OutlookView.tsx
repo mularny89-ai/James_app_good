@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import EmailInput from "@/components/EmailInput";
 
 type Folder = { id: string; name: string; key: string; unread: number; total: number };
 
@@ -75,6 +76,7 @@ export default function OutlookView({ account }: { account: string }) {
   const [loadingList, setLoadingList] = useState(false);
   const [query, setQuery] = useState("");
   const [activeQuery, setActiveQuery] = useState("");
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [selected, setSelected] = useState<FullMessage | null>(null);
   const [loadingMsg, setLoadingMsg] = useState(false);
   const [compose, setCompose] = useState<ComposeState>(null);
@@ -168,6 +170,17 @@ export default function OutlookView({ account }: { account: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ flagged }),
     });
+  };
+
+  const toggleRead = async (m: ListMessage) => {
+    const isRead = !m.isRead;
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, isRead } : x)));
+    await fetch(`/api/email/messages/${encodeURIComponent(m.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isRead }),
+    });
+    loadFolders();
   };
 
   const startCompose = (mode: NonNullable<ComposeState>["mode"], m?: FullMessage) => {
@@ -269,6 +282,14 @@ export default function OutlookView({ account }: { account: string }) {
           )}
         </div>
         <button className="btn" onClick={refresh} disabled={loadingList} title="Refresh">↻</button>
+        <button
+          className={`btn ${unreadOnly ? "font-bold" : ""}`}
+          style={unreadOnly ? { borderColor: "var(--brand-primary)", color: "var(--brand-primary)" } : undefined}
+          onClick={() => setUnreadOnly((u) => !u)}
+          title="Show unread only"
+        >
+          Unread
+        </button>
         {notice && <span className="text-sm text-ok">{notice}</span>}
         {error && <span className="text-sm text-err">{error}</span>}
       </div>
@@ -297,7 +318,7 @@ export default function OutlookView({ account }: { account: string }) {
               Search results for "{activeQuery}" — all folders
             </div>
           )}
-          {messages.map((m) => (
+          {messages.filter((m) => !unreadOnly || !m.isRead).map((m) => (
             <button
               key={m.id}
               onClick={() => openMessage(m)}
@@ -360,11 +381,11 @@ export default function OutlookView({ account }: { account: string }) {
               <div className="mb-2 space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="w-10 text-xs font-semibold text-ink-muted">To</span>
-                  <input className="input flex-1" value={compose.to} onChange={(e) => setCompose({ ...compose, to: e.target.value })} placeholder="recipient@email.com" />
+                  <EmailInput value={compose.to} onChange={(v) => setCompose({ ...compose, to: v })} placeholder="Start typing a name or email…" />
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-10 text-xs font-semibold text-ink-muted">Cc</span>
-                  <input className="input flex-1" value={compose.cc} onChange={(e) => setCompose({ ...compose, cc: e.target.value })} />
+                  <EmailInput value={compose.cc} onChange={(v) => setCompose({ ...compose, cc: v })} />
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-10 text-xs font-semibold text-ink-muted">Subj</span>
@@ -411,6 +432,13 @@ export default function OutlookView({ account }: { account: string }) {
                     <button className="btn px-2 py-1 text-xs" onClick={() => startCompose("reply", selected)}>↩ Reply</button>
                     <button className="btn px-2 py-1 text-xs" onClick={() => startCompose("replyAll", selected)}>↩↩ All</button>
                     <button className="btn px-2 py-1 text-xs" onClick={() => startCompose("forward", selected)}>→ Fwd</button>
+                    <button
+                      className="btn px-2 py-1 text-xs"
+                      title={selected.isRead ? "Mark unread" : "Mark read"}
+                      onClick={() => toggleRead(selected)}
+                    >
+                      {selected.isRead ? "✉" : "✉✓"}
+                    </button>
                     <button className="btn px-2 py-1 text-xs text-err" onClick={() => deleteMessage(selected)}>🗑</button>
                   </div>
                 </div>

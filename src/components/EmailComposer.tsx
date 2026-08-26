@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import EmailInput from "@/components/EmailInput";
 
 export type EmailJobOpt = { id: number; label: string };
 
@@ -174,7 +175,7 @@ export default function EmailComposer({ jobs, connected }: { jobs: EmailJobOpt[]
                   {copied === "to" ? "Copied ✓" : "Copy"}
                 </button>
               </div>
-              <input className="input w-full" value={to} onChange={(e) => setTo(e.target.value)} placeholder="recipient@email.com" />
+              <EmailInput value={to} onChange={setTo} placeholder="Start typing a name or email…" />
             </div>
             <div>
               <div className="mb-1 flex items-center justify-between">

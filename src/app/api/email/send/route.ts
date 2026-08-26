@@ -19,8 +19,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Attachments too large (3 MB max)." }, { status: 400 });
   }
 
-  const toRecipients = [{ emailAddress: { address: to } }];
-  const ccRecipients = cc ? String(cc).split(/[;,]/).map((e: string) => e.trim()).filter(Boolean).map((e: string) => ({ emailAddress: { address: e } })) : [];
+  // Accepts "Name <addr@x>" (from autocomplete) and ; , separated lists.
+  const parseRecipients = (raw: string) =>
+    String(raw)
+      .split(/[;,]/)
+      .map((e) => e.trim())
+      .filter(Boolean)
+      .map((e) => {
+        const m = e.match(/^(.*)<([^>]+)>$/);
+        return m
+          ? { emailAddress: { address: m[2].trim(), name: m[1].trim() } }
+          : { emailAddress: { address: e } };
+      });
+  const toRecipients = parseRecipients(to);
+  const ccRecipients = cc ? parseRecipients(cc) : [];
 
   let res: Response;
   try {
