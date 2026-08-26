@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 export const MSAL_SCOPES = ["Mail.Read", "Mail.Send", "offline_access", "User.Read"];
 
 function clientId(): string {
-  return process.env.MSAL_CLIENT_ID || "4369d0ba-775e-4ecb-9a18-a1f1d4335e8b";
+  return process.env.MSAL_CLIENT_ID || "eedcf15a-9a4b-4325-a2f4-f7fb0dfe3275";
 }
 
 function clientSecret(): string | undefined {
