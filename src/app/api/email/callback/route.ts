@@ -5,7 +5,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const base = `${url.protocol}//${url.host}`;
+  const proto = req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "");
+  const host = req.headers.get("x-forwarded-host") || url.host;
+  const base = `${proto}://${host}`;
   const code = url.searchParams.get("code");
   const error = url.searchParams.get("error_description") || url.searchParams.get("error");
 
