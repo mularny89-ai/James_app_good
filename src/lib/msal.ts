@@ -10,23 +10,36 @@ function clientId(): string {
   return process.env.MSAL_CLIENT_ID || "eedcf15a-9a4b-4325-a2f4-f7fb0dfe3275";
 }
 
-function clientSecret(): string | undefined {
-  return process.env.MSAL_CLIENT_SECRET || undefined;
-}
-
-export function msalRedirectUri(): string {
+export function msalRedirectUri(reqBase?: string): string {
   const base =
     process.env.APP_BASE_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:12000");
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+    reqBase ||
+    "http://localhost:12000";
   return `${base.replace(/\/$/, "")}/api/email/callback`;
 }
 
-export function msalConfigured(): boolean {
-  return Boolean(clientSecret());
+export function requestBase(req: Request): string {
+  const url = new URL(req.url);
+  const proto = req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "");
+  const host = req.headers.get("x-forwarded-host") || url.host;
+  return `${proto}://${host}`;
+}
+
+// Secret comes from the env var if set, otherwise the value saved on the Email page.
+async function getClientSecret(): Promise<string | undefined> {
+  if (process.env.MSAL_CLIENT_SECRET) return process.env.MSAL_CLIENT_SECRET;
+  const s = await db.companySettings.findUnique({ where: { id: 1 }, select: { msalClientSecret: true } });
+  return s?.msalClientSecret || undefined;
+}
+
+export async function msalConfigured(): Promise<boolean> {
+  return Boolean(await getClientSecret());
 }
 
 async function buildClient(): Promise<ConfidentialClientApplication> {
   const s = await db.companySettings.findUnique({ where: { id: 1 } });
+  const secret = s?.msalClientSecret || process.env.MSAL_CLIENT_SECRET;
   const cachePlugin = {
     beforeCacheAccess: async (ctx: any) => {
       if (s?.msalTokenCache) ctx.tokenCache.deserialize(s.msalTokenCache);
@@ -43,7 +56,7 @@ async function buildClient(): Promise<ConfidentialClientApplication> {
   const config: Configuration = {
     auth: {
       clientId: clientId(),
-      clientSecret: clientSecret(),
+      clientSecret: secret,
       authority: `https://login.microsoftonline.com/${s?.msalTenantId || "common"}`,
     },
     cache: { cachePlugin },
@@ -59,21 +72,21 @@ export async function msalConnection() {
   return { connected: Boolean(s?.msalTokenCache), account: s?.msalAccount ?? "" };
 }
 
-export async function getAuthUrl(): Promise<string> {
+export async function getAuthUrl(reqBase?: string): Promise<string> {
   const app = await buildClient();
   return app.getAuthCodeUrl({
     scopes: MSAL_SCOPES,
-    redirectUri: msalRedirectUri(),
+    redirectUri: msalRedirectUri(reqBase),
     prompt: "select_account",
   });
 }
 
-export async function handleAuthCallback(code: string): Promise<string> {
+export async function handleAuthCallback(code: string, reqBase?: string): Promise<string> {
   const app = await buildClient();
   const result = await app.acquireTokenByCode({
     code,
     scopes: MSAL_SCOPES,
-    redirectUri: msalRedirectUri(),
+    redirectUri: msalRedirectUri(reqBase),
   });
   if (!result?.account) throw new Error("Microsoft did not return an account.");
   const homeId = result.account.homeAccountId;
@@ -88,7 +101,7 @@ export async function handleAuthCallback(code: string): Promise<string> {
 }
 
 async function acquireToken(): Promise<string> {
-  if (!clientSecret()) throw new Error("NOT_CONNECTED");
+  if (!(await getClientSecret())) throw new Error("NOT_CONNECTED");
   const app = await buildClient();
   const accounts = await app.getTokenCache().getAllAccounts();
   if (!accounts.length) throw new Error("NOT_CONNECTED");

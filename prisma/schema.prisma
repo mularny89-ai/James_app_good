@@ -43,6 +43,8 @@ model CompanySettings {
   msalTokenCache  String @default("")
   msalAccount     String @default("")
   msalTenantId    String @default("common")
+  // Azure app client secret — set via the Email page; env MSAL_CLIENT_SECRET takes precedence
+  msalClientSecret String @default("")
   // Preferences
   dateFormat       String  @default("d MMM yyyy") // Australian
   timeFormat       String  @default("24h")

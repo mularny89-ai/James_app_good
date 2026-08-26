@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 export default async function EmailPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const { connected, account } = await msalConnection();
-  const configured = msalConfigured();
+  const configured = await msalConfigured();
+  const saved = searchParams.saved;
   const notice = searchParams.error;
   const justConnected = searchParams.connected;
 
@@ -39,6 +40,11 @@ export default async function EmailPage({ searchParams }: { searchParams: Record
           Connected to Microsoft 365 as {decodeURIComponent(justConnected)} ✓
         </div>
       )}
+      {saved && (
+        <div className="mb-4 rounded-md border border-ok/30 bg-green-50 px-3 py-2 text-sm text-ok">
+          Credentials saved ✓ — now click Connect Microsoft 365 and sign in.
+        </div>
+      )}
 
       {/* Microsoft 365 connection */}
       <div className="card mb-4 p-4">
@@ -51,7 +57,7 @@ export default async function EmailPage({ searchParams }: { searchParams: Record
               ) : configured ? (
                 <>Not connected. Connect once with your Microsoft 365 login and the app can read your inbox and send email for you.</>
               ) : (
-                <>This server is missing the Microsoft app secret (MSAL_CLIENT_SECRET) — add it to the environment, then connect.</>
+                <>Almost there — paste the client secret from your Azure app registration below, then connect.</>
               )}
             </p>
           </div>
@@ -71,6 +77,23 @@ export default async function EmailPage({ searchParams }: { searchParams: Record
           </div>
         </div>
       </div>
+
+      {!configured && !connected && (
+        <div className="card mb-4 p-4">
+          <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink-muted">One-time setup: paste your client secret</h2>
+          <form action="/api/email/config" method="POST" className="flex flex-wrap items-end gap-2">
+            <div className="min-w-72 flex-1">
+              <label className="label">Client secret (the "Value" from Certificates &amp; secrets)</label>
+              <input name="secret" type="password" className="input w-full" placeholder="e.g. aBc1~xYz..." required />
+            </div>
+            <button type="submit" className="btn-primary">Save</button>
+          </form>
+          <p className="mt-2 text-xs text-ink-muted">
+            Stored in the app database, never shown again. Azure app: Mellan Practice Manager
+            (client ID eedcf15a-…3275 is already configured).
+          </p>
+        </div>
+      )}
 
       <InboxPanel connected={connected} account={account} />
 
