@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Suggestion = { id: number; value: string; detail: string };
+type Suggestion = { id: number; value: string; detail: string; street: string; suburb: string };
+
+// "14 Example Street" + "Broadbeach" from Nominatim address parts.
+function addressParts(a: Record<string, string>): { street: string; suburb: string } {
+  const street = [a.house_number, a.road].filter(Boolean).join(" ");
+  const suburb = a.suburb || a.town || a.city || a.village || a.hamlet || "";
+  return { street, suburb };
+}
 
 const STATE_ABBR: Record<string, string> = {
   "Queensland": "QLD",
@@ -33,11 +40,14 @@ export default function AddressAutocomplete({
   defaultValue = "",
   required,
   placeholder = "Start typing an address…",
+  onPick,
 }: {
   name: string;
   defaultValue?: string;
   required?: boolean;
   placeholder?: string;
+  /** Called with the picked suggestion's structured parts (for split street/suburb fields). */
+  onPick?: (parts: { value: string; street: string; suburb: string }) => void;
 }) {
   const [text, setText] = useState(defaultValue);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -46,6 +56,7 @@ export default function AddressAutocomplete({
   const ref = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const skipRef = useRef(false); // suppresses the re-fetch after a suggestion is picked
+  const mountRef = useRef(true); // don't pop the dropdown open on first render (e.g. edit forms)
 
   useEffect(() => {
     if (skipRef.current) {
@@ -58,7 +69,8 @@ export default function AddressAutocomplete({
       setOpen(false);
       return;
     }
-    setOpen(true);
+    if (!mountRef.current) setOpen(true);
+    mountRef.current = false;
     const t = setTimeout(async () => {
       abortRef.current?.abort();
       const ctrl = new AbortController();
@@ -68,11 +80,15 @@ export default function AddressAutocomplete({
         if (!res.ok) return;
         const rows: { place_id: number; display_name: string; address?: Record<string, string> }[] = await res.json();
         setSuggestions(
-          rows.map((r) => ({
-            id: r.place_id,
-            value: r.address ? formatAddress(r.address) || r.display_name : r.display_name,
-            detail: r.display_name,
-          }))
+          rows.map((r) => {
+            const parts = r.address ? addressParts(r.address) : { street: "", suburb: "" };
+            return {
+              id: r.place_id,
+              value: r.address ? formatAddress(r.address) || r.display_name : r.display_name,
+              detail: r.display_name,
+              ...parts,
+            };
+          })
         );
         setActive(-1);
       } catch {
@@ -95,6 +111,7 @@ export default function AddressAutocomplete({
     setText(s.value);
     setSuggestions([]);
     setOpen(false);
+    onPick?.({ value: s.value, street: s.street, suburb: s.suburb });
   };
 
   return (

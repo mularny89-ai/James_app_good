@@ -136,6 +136,9 @@ model Quote {
   client       Client      @relation(fields: [clientId], references: [id])
   contactName  String      @default("")
   siteAddress  String      @default("")
+  // Structured site address; siteAddress stays as the formatted display string
+  siteStreet   String      @default("")
+  siteSuburb   String      @default("")
   project      String      @default("")
   projectType  String      @default("")
   scope        String      @default("")
@@ -312,6 +315,9 @@ model Invoice {
   jobId           Int?
   job             Job?          @relation(fields: [jobId], references: [id])
   siteAddress     String        @default("")
+  // Structured site address; siteAddress stays as the formatted display string
+  siteStreet      String        @default("")
+  siteSuburb      String        @default("")
   description     String        @default("")
   subtotal        Float         @default(0)
   gst             Float         @default(0)

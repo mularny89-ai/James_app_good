@@ -55,6 +55,7 @@ export default async function InvoiceDetailPage({
     const invoiced = j.invoices.reduce((s, i) => s + i.total / (1 + settings.gstRate / 100), 0);
     return {
       id: j.id, jobNumber: j.jobNumber, name: j.name, siteAddress: j.siteAddress,
+      siteStreet: j.siteStreet, siteSuburb: j.siteSuburb,
       billingAddress: j.billingAddress || j.client.billingAddress,
       remainingFee: j.quotedFee + j.variations - invoiced,
     };
@@ -113,6 +114,8 @@ export default async function InvoiceDetailPage({
             invoice={{
               jobId: invoice.jobId,
               siteAddress: invoice.siteAddress,
+              siteStreet: invoice.siteStreet,
+              siteSuburb: invoice.siteSuburb,
               billingAddress: invoice.billingAddress,
               description: invoice.description,
               dueDate: toInputDate(invoice.dueDate),

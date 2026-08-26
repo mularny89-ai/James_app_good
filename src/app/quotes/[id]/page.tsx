@@ -6,6 +6,7 @@ import { toInputDate } from "@/lib/format";
 import { updateQuote, setQuoteStatus, duplicateQuote, acceptQuoteAndCreateJob, archiveQuote } from "@/lib/actions/quotes";
 import { PageHeader, SoftBadge, Field } from "@/components/ui";
 import ClientSelect from "@/components/ClientSelect";
+import SiteAddressFields from "@/components/SiteAddressFields";
 import TaskItemsEditor from "@/components/TaskItemsEditor";
 import { presetOpts } from "@/lib/presets";
 import BrandDocument from "@/components/BrandDocument";
@@ -141,7 +142,7 @@ export default async function QuoteDetailPage({
                 {types.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
               </select>
             </Field>
-            <Field label="Site Address" className="sm:col-span-2"><input name="siteAddress" className="input" defaultValue={quote.siteAddress} /></Field>
+            <SiteAddressFields defaultStreet={quote.siteStreet || quote.siteAddress} defaultSuburb={quote.siteSuburb} />
             <Field label="Scope of Works" className="sm:col-span-2"><textarea name="scope" rows={3} className="input" defaultValue={quote.scope} /></Field>
             <Field label="Exclusions" className="sm:col-span-2"><textarea name="exclusions" rows={2} className="input" defaultValue={quote.exclusions} /></Field>
             <Field label="Valid Until"><input type="date" name="validUntil" className="input" defaultValue={toInputDate(quote.validUntil)} /></Field>

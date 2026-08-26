@@ -4,6 +4,7 @@ import { peekNextQuoteNumber } from "@/lib/numbering";
 import { getSettings } from "@/lib/settings";
 import { PageHeader, Field } from "@/components/ui";
 import ClientSelect from "@/components/ClientSelect";
+import SiteAddressFields from "@/components/SiteAddressFields";
 import TaskItemsEditor from "@/components/TaskItemsEditor";
 import { presetOpts } from "@/lib/presets";
 
@@ -39,7 +40,7 @@ export default async function NewQuotePage({ searchParams }: { searchParams: Rec
               {types.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
             </select>
           </Field>
-          <Field label="Site Address" className="sm:col-span-2"><input name="siteAddress" className="input" placeholder="Street, Suburb" /></Field>
+          <SiteAddressFields />
           <Field label="Scope of Works" className="sm:col-span-2"><textarea name="scope" rows={3} className="input" placeholder="e.g. Structural design for residential extension" /></Field>
           <Field label="Exclusions" className="sm:col-span-2"><textarea name="exclusions" rows={2} className="input" /></Field>
           <Field label="Valid Until"><input type="date" name="validUntil" className="input" defaultValue={defaultValid} /></Field>

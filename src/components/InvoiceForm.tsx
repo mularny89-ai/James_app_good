@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import SearchableSelect from "@/components/SearchableSelect";
+import SiteAddressFields from "@/components/SiteAddressFields";
 import TaskItemsEditor, { TaskItemRow, PresetOpt } from "@/components/TaskItemsEditor";
 import { Field } from "@/components/ui";
 import { displayJobName } from "@/lib/format";
@@ -11,6 +12,8 @@ type JobOpt = {
   jobNumber: string;
   name: string;
   siteAddress: string;
+  siteStreet: string;
+  siteSuburb: string;
   billingAddress: string;
   remainingFee: number; // quoted + variations − already invoiced
 };
@@ -33,6 +36,8 @@ export default function InvoiceForm({
   invoice?: {
     jobId: number | null;
     siteAddress: string;
+    siteStreet: string;
+    siteSuburb: string;
     billingAddress: string;
     description: string;
     dueDate: string;
@@ -72,9 +77,10 @@ export default function InvoiceForm({
         <Field label="Billing Address" className="sm:col-span-2">
           <input name="billingAddress" className="input" defaultValue={invoice?.billingAddress ?? job?.billingAddress ?? ""} />
         </Field>
-        <Field label="Site Address" className="sm:col-span-2">
-          <input name="siteAddress" className="input" defaultValue={invoice?.siteAddress ?? job?.siteAddress ?? ""} />
-        </Field>
+        <SiteAddressFields
+          defaultStreet={invoice?.siteStreet || invoice?.siteAddress || job?.siteStreet || job?.siteAddress || ""}
+          defaultSuburb={invoice?.siteSuburb ?? job?.siteSuburb ?? ""}
+        />
       </div>
 
       {job && !invoice && (

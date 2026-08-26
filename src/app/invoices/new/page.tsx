@@ -25,6 +25,8 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: R
       jobNumber: j.jobNumber,
       name: j.name,
       siteAddress: j.siteAddress,
+      siteStreet: j.siteStreet,
+      siteSuburb: j.siteSuburb,
       billingAddress: j.billingAddress || j.client.billingAddress,
       remainingFee: j.quotedFee + j.variations - invoiced,
     };

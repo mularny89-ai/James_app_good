@@ -46,6 +46,17 @@ function totals(items: LineItem[], gstRate: number) {
   return { subtotal, gst, total: subtotal + gst };
 }
 
+/** Split street/suburb fields win; a legacy combined siteAddress is split as a fallback. */
+function siteFromForm(fd: FormData) {
+  const street = str(fd, "siteStreet");
+  const suburb = str(fd, "siteSuburb");
+  if (street || suburb) {
+    return { street, suburb, full: [street, suburb].filter(Boolean).join(", ") };
+  }
+  const parts = splitAddress(str(fd, "siteAddress"));
+  return { street: parts.street, suburb: parts.suburb, full: str(fd, "siteAddress") };
+}
+
 export async function createQuote(fd: FormData) {
   const clientId = parseInt(str(fd, "clientId"));
   if (!clientId) throw new Error("Select a client.");
@@ -53,6 +64,8 @@ export async function createQuote(fd: FormData) {
   const settings = await getSettings();
   const items = parseItems(fd);
   const t = totals(items, settings.gstRate);
+
+  const site = siteFromForm(fd);
 
   const quote = await db.$transaction(async (tx) => {
     const { seq } = await nextNumber(tx, "quote");
@@ -62,7 +75,9 @@ export async function createQuote(fd: FormData) {
         quoteNumber,
         clientId,
         contactName: str(fd, "contactName") || client.contactPerson,
-        siteAddress: str(fd, "siteAddress"),
+        siteAddress: site.full,
+        siteStreet: site.street,
+        siteSuburb: site.suburb,
         // Project removed from the entry workflow; column kept for historical data.
         projectType: str(fd, "projectType"),
         scope: str(fd, "scope"),
@@ -93,6 +108,8 @@ export async function updateQuote(id: number, fd: FormData) {
   const t = totals(items, settings.gstRate);
   const clientId = parseInt(str(fd, "clientId"));
 
+  const site = siteFromForm(fd);
+
   await db.$transaction(async (tx) => {
     await tx.quoteItem.deleteMany({ where: { quoteId: id } });
     await tx.quote.update({
@@ -100,7 +117,9 @@ export async function updateQuote(id: number, fd: FormData) {
       data: {
         clientId,
         contactName: str(fd, "contactName"),
-        siteAddress: str(fd, "siteAddress"),
+        siteAddress: site.full,
+        siteStreet: site.street,
+        siteSuburb: site.suburb,
         project: str(fd, "project"),
         projectType: str(fd, "projectType"),
         scope: str(fd, "scope"),
@@ -143,6 +162,8 @@ export async function duplicateQuote(id: number) {
         clientId: src.clientId,
         contactName: src.contactName,
         siteAddress: src.siteAddress,
+        siteStreet: src.siteStreet,
+        siteSuburb: src.siteSuburb,
         project: src.project,
         projectType: src.projectType,
         scope: src.scope,
@@ -188,7 +209,9 @@ export async function acceptQuoteAndCreateJob(id: number) {
       ? await tx.jobType.findUnique({ where: { name: quote.projectType } })
       : null;
 
-    const siteParts = splitAddress(quote.siteAddress);
+    const siteParts = quote.siteStreet || quote.siteSuburb
+      ? { street: quote.siteStreet, suburb: quote.siteSuburb }
+      : splitAddress(quote.siteAddress);
     const job = await tx.job.create({
       data: {
         jobNumber,

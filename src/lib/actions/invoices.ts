@@ -4,11 +4,23 @@ import { db } from "@/lib/db";
 import { logActivity } from "@/lib/activity";
 import { nextNumber, formatInvoiceNumber } from "@/lib/numbering";
 import { getSettings } from "@/lib/settings";
-import { parseInputDate } from "@/lib/format";
+import { parseInputDate, splitAddress } from "@/lib/format";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
+
+/** Split street/suburb fields win; a legacy combined siteAddress is split as a fallback. */
+function siteFromForm(fd: FormData) {
+  const street = str(fd, "siteStreet");
+  const suburb = str(fd, "siteSuburb");
+  if (street || suburb) {
+    return { street, suburb, full: [street, suburb].filter(Boolean).join(", ") };
+  }
+  const legacy = str(fd, "siteAddress");
+  const parts = splitAddress(legacy);
+  return { street: parts.street, suburb: parts.suburb, full: legacy };
+}
 
 type LineItem = { name: string; description: string; qty: number; unitPrice: number; gst: boolean };
 
@@ -66,6 +78,8 @@ export async function createInvoice(fd: FormData) {
   const items = parseItems(fd);
   const t = totals(items, settings.gstRate);
 
+  const site = siteFromForm(fd);
+
   const invoice = await db.$transaction(async (tx) => {
     const { seq } = await nextNumber(tx, "invoice");
     const invoiceNumber = await formatInvoiceNumber(seq);
@@ -75,7 +89,9 @@ export async function createInvoice(fd: FormData) {
         clientId,
         jobId: job?.id ?? null,
         billingAddress: str(fd, "billingAddress") || job?.billingAddress || client.billingAddress,
-        siteAddress: str(fd, "siteAddress") || job?.siteAddress || "",
+        siteAddress: site.full || job?.siteAddress || "",
+        siteStreet: site.street || job?.siteStreet || "",
+        siteSuburb: site.suburb || job?.siteSuburb || "",
         description: str(fd, "description") || job?.name || "",
         dueDate: parseInputDate(str(fd, "dueDate")),
         notes: str(fd, "notes"),
@@ -102,13 +118,16 @@ export async function updateInvoice(id: number, fd: FormData) {
   const settings = await getSettings();
   const items = parseItems(fd);
   const t = totals(items, settings.gstRate);
+  const site = siteFromForm(fd);
   const inv = await db.$transaction(async (tx) => {
     await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
     return tx.invoice.update({
       where: { id },
       data: {
         billingAddress: str(fd, "billingAddress"),
-        siteAddress: str(fd, "siteAddress"),
+        siteAddress: site.full,
+        siteStreet: site.street,
+        siteSuburb: site.suburb,
         description: str(fd, "description"),
         dueDate: parseInputDate(str(fd, "dueDate")),
         notes: str(fd, "notes"),
