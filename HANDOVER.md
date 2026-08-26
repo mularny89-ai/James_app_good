@@ -1,4 +1,4 @@
-# HANDOVER — Full Transition Notes (2026-08-24/25 → 26)
+# HANDOVER — Full Transition Notes (2026-08-26, end of email-integration session)
 
 Read this first if you're picking up the Mellan Practice Manager. Everything here
 is verified against the code in this repo right now.
@@ -12,72 +12,102 @@ is verified against the code in this repo right now.
 - Kill port: `for p in $(ps aux|grep next-server|grep -v grep|awk '{print $2}'); do kill -9 $p; done`
 - Build check: `npm run build`
 - Tests: `npm test` → `node tests/run.cjs` (baseline-based; live-data safe). 52 assertions.
+- sqlite3 CLI not available — use `node -e` with PrismaClient for DB access.
+- TS target doesn't support spread/iteration of Sets/Maps — use `Array.from(...)`.
 
 ## Repo state
 
-- Branch: `engineering-app` (not pushed this session — all planner work is in the working tree)
-- Recent commits (previous session): `f55de23` Forms …
-- The planner overhaul below is **uncommitted** — commit it when the user approves.
+- Branch: `engineering-app`, **everything committed and pushed** (HEAD `7a327f2`).
+- Working tree clean. `git status` should show nothing.
 
-## Dummy data in the DB (do NOT wipe — user wants it kept for testing)
+## Email module (this session's big build) — `/email`
 
-- **Clients**: Danny D (id 2, MCE), Poo Face (id 4, PFC)
-- **Employees**: James Mellan (Structural Engineer, assignable)
-- **Jobs**:
-  - id 1 `J66001` — Danny D · To Start · 2026-08-11→2026-08-14 · 4 working days · colour `#3b5bdb` · plannerSortOrder 10
-  - id 3 `J66002` — Danny D · To Start · 2026-08-26→2026-09-01 · 5 working days · colour `#9c36b5` · plannerSortOrder 20 · siteAddress "45 James Street, Bong QLD 4225"
-  - Both overlap for testing planner lanes
-- **Quotes**: Q66003 (Draft, client 2, "14 Thomas Street, Tomville", New Home, subtotal 1200), Q66004 (Accepted, client 2, "45 James Street, Bong", New Home, subtotal 400)
-- **Site inspections** (independent, not linked to jobs — jobId null):
-  - id 1: James Street, Glossodia NSW 2756 · 2026-08-26 09:00–10:00 · Scheduled
-  - id 2: 67 Thomas Street, Ultimo NSW 2007 · 2026-08-25 09:00–10:00 · Scheduled
-  - id 3: 45 Track Road, Tallebudgera · 2026-08-25 09:00–10:00 · Confirmed
-- Tasks list is currently empty; `calendarEvent` table empty.
+Sidebar "✉ Email" → page with **Microsoft 365 Connection card** + **EmailTabs**
+(Mail | Assistant | Quote/Invoice Generator).
 
-## Planner overhaul (the big work of this session)
+### Microsoft 365 / Outlook integration (LIVE, connected as james@mellanconsulting.com.au)
 
-The Job Planner's Month / 6 Weeks / 3 Months views were redesigned from per-job
-rows to **one shared calendar grid** with overlapping jobs stacked in lanes.
+- **Azure app registration**: "Mellan Practice Manager", client ID `eedcf15a-9a4b-4325-a2f4-f7fb0dfe3275`,
+  single-tenant, tenant `3a228346-9ee3-4dbb-a8da-3a06fc8d550d` (DEFAULT_TENANT in `src/lib/msal.ts` —
+  /common is rejected for single-tenant apps, AADSTS50194).
+- Delegated Graph perms granted: Mail.Read, Mail.Send, offline_access, User.Read.
+- **Client secret lives in the DB** (`CompanySettings.msalClientSecret`), pasted via a form on the
+  Email page (`/api/email/config` — form-data POST, also accepts `aiKey`). Env `MSAL_CLIENT_SECRET`
+  overrides if set. Secret form shows whenever not connected (so a wrong value can be replaced).
+- MSAL token cache persisted in `CompanySettings.msalTokenCache` (+ `msalAccount`, `msalTenantId`);
+  refresh-token `acquireTokenSilent` keeps it connected.
+- **Redirect URI is request-derived** (`requestBase()` from x-forwarded-proto/host) — the proxy
+  passes localhost:12000 internally, so never build redirects from `req.url` host alone.
+  Registered redirect in Azure: `https://work-1-jjpurumwskflifxe.prod-runtime.all-hands.dev/api/email/callback`.
+  A new domain needs its callback added under Authentication in the app registration.
+- API routes: `/api/email/connect` (OAuth start), `/callback`, `/disconnect`, `/folders`,
+  `/messages` (folder + `?q=` full-mailbox `$search` + `?skip` paging), `/messages/[id]`
+  (GET full + attachments meta, PATCH isRead/flag, DELETE), `/messages/[id]/attachments/[attId]`
+  (streams file), `/send` (sendMail or /reply|/replyAll threading, attachments ≤3MB, parses
+  "Name <addr>;" lists, logs to job activity), `/contacts` (autocomplete: clients + employees +
+  Graph full-mailbox search), `/to-task` (GET lists / POST create task w/ listId), `/assistant`.
+- **Graph gotcha**: `wellKnownName` is NOT selectable on this mailbox — folders matched by
+  display name in `/api/email/folders`.
 
-Files involved:
-- `src/lib/planner.ts` — helpers
-- `src/components/PlannerWrappedView.tsx` — the shared wrapped-grid renderer (Month/6W/3M)
-- `src/components/PlannerBoard.tsx` — dispatcher; Week view; filters; wheel nav
-- `src/app/planner/page.tsx` — server page (builds DayCol, nav hrefs, filters)
+### Mail tab — `src/components/OutlookView.tsx`
 
-### Behaviour
+Outlook-style 3-pane: folder sidebar (unread counts), message list (unread bold, 📎, ⚑ flag
+toggle, smart dates, client/job chips, Load more), reading pane (sandboxed iframe for HTML,
+attachment downloads, Reply/ReplyAll/Fwd/Delete, mark read/unread, **✓ Task** → dropdown of all
+task lists). Toolbar: New mail, search (all folders), refresh, Unread + 📎/👤/⚑ filter chips.
+Compose pane: To/Cc use `EmailInput` (autocomplete, keyboard nav, inserts `Name <addr>;`),
+📎 attachments, Send via Graph.
 
-1. **Shared grid + lanes** — `assignLanes()` in PlannerWrappedView assigns each overlapping job to lane 0, 1, 2… within each week strip. Footer note says "N overlapping jobs are stacked in separate lanes…".
+### Assistant tab — `src/components/AssistantView.tsx` + `/api/email/assistant`
 
-2. **Rolling week-anchored windows** — `viewWindow()` was **changed**: Month=28 days, 6 Weeks=42 days, 3 Months=84 days, all starting on the Monday of the anchor's week. NOT padded to calendar-month boundaries anymore — this is what makes week-scroll work and prevents month-boundary jobs being skipped. `stepAnchor()` still steps by view-length for the ‹Prev/Next› buttons. Regression tests updated accordingly (`tests/regression.ts`).
+- Full-page chat: quick-action cards (Triage inbox / Waiting on me / Today's summary / Quotes
+  outstanding), conversation thread, **tool activity chips** per turn, draft preview card with
+  "Open in compose →" (hands off to Generator tab via `EmailComposer initialDraft`).
+- **Providers**: no key → **local Ollama** (`qwen2.5:1.5b` default — 3b OOM-killed the Next
+  server under concurrent load; OLLAMA_BASE_URL/OLLAMA_MODEL env override). Key set
+  (`ANTHROPIC_API_KEY` env or `CompanySettings.aiApiKey`) → Claude Sonnet. Same 4 tools both
+  paths: search_mailbox, read_email (8000 chars), get_job_context (job № or address → client/
+  status/quote/invoices), draft_email. Agentic loop capped at 6 rounds; returns
+  `{reply, draft, model, activity}`.
+- **Ollama runs on this box** (`ollama serve`, port 11434, models qwen2.5:1.5b + 3b pulled).
+  It is NOT in git — a fresh sandbox needs `ollama serve` + `ollama pull qwen2.5:1.5b` again.
+  ~30–90s per question on CPU; one question at a time.
+- System prompt: Mellan voice (plain AU English, "Cheers, James", $400+GST inspections,
+  Form 15/12 wording), mandates search-before-answer.
 
-3. **Day numbers always visible** — `numberOverlay()` renders a `pointer-events-none z-30` grid of white chips (bg-white/60) above bars so day numbers stay visible over bars; bars remain clickable/draggable underneath.
+### Generator tab — `src/components/EmailComposer.tsx`
 
-4. **Month separators + alternating shading** — `stripMeta()` detects the first day-of-month in each strip arithmetically from ISO; renderStrip draws a 4px brand-colour separator + bold "MONTH YEAR" label; `stripStyle` alternates `rgba(248,250,252,0.7)` tint per month.
+Job dropdown + Quote/Invoice toggle → `/api/email/draft` merges the Settings email template
+(quote) or default invoice wording with job/client/doc data. Copy buttons, Open in Mail App
+(mailto), **Send via Outlook** when connected. Accepts `initialDraft` from the assistant.
 
-5. **Clean continuation labels** — `barLabel(density, j, segDays, firstSeg)` — label only on the first real segment (or when window-clipped). Continuation segments show just the ◂ / ▸ arrows at the edge.
+## Earlier this session (all committed)
 
-6. **Bar label indent** — first segment's label gets `paddingLeft` 20–22px so it sits beside the day-number chip, not under it.
+- `76cc0..` split site address + autocomplete for quotes/invoices
+- `b468393` email template quote fixes + Add-Task modal (backdrop/Enter/Save)
+- `c5e5f2c` jobs list year grouping; `5160202` job № sort toggle + short job names
+  (`J66001 — 14 Bob Street, Bobtown` — street+suburb only, in createJob + acceptQuoteAndCreateJob)
+- `837040c` Add-task modal: plain Save on blank form closes
+- `86877c4` Quote № / Invoice № column sort toggles (numeric-aware, persists through filters)
+- `9b61fbf` Email section v1; `b0b6897` full M365 integration; `292b5aa` forwarded-host redirects
+- `54c9b2d` client ID default; `ea48ba5` paste-in-app secret; `b609761` form-data fix;
+  `c90717a` tenant default; `f3e5dbe` secret form always visible until connected
+- `a57109a` Outlook 3-pane UI; `09f0397` autocomplete + unread filter; `9c6ef4f` assistant v1;
+  `c0b8eb1` Ollama provider; `f5242a8` smart views + email-to-task; `2c0f6f4` task list dropdown;
+  `7a327f2` tabbed interface + full-page assistant
 
-7. **Wheel navigation = ±1 week, every view** — in `PlannerBoard.tsx`, a native `wheel` listener with `passive:false` on the grid container accumulates deltas; at 60px threshold it navigates to `start= anchor ±7 days`, using the Prev/Next href shape only as a filter-carrier template, then locks 500ms. Week view, Month, 6W, 3M all behave the same.
+## User preferences (unchanged)
 
-8. **Week row label clipping** — row label cell is `overflow-hidden` with inner `overflow-hidden` wrapper and `w-full truncate` button, so long titles/addresses don't bleed into the timeline.
+- Numbered fix lists; implement in place, don't rebuild pages.
+- Verify in browser before reporting; clean up test data.
+- **Commit AND push to `engineering-app` as soon as verified** — sandbox resets wipe the tree.
+- If push auth fails: `git remote set-url origin https://${GITHUB_TOKEN}@github.com/mularny89-ai/James_app_good.git`
+- Native `<input type=date>` and native `<select>` can't be filled by browser tooling.
+- Server sleeps when idle — tell user to wait ~15s and refresh, or restart it.
 
-9. **Responsive lane heights** — `useEffect` in PlannerWrappedView computes `laneH = clamp((viewportHeight - elementTop - 24) / nWeeks - 16, MIN, MAX)` per density with MAX = { month:34, sixweeks:28, threemonths:24 }. Root div has `id="planner-wrapped-root"` for measuring. Fonts bumped to text-xs / 11px / 10px.
+## Known rough edges / next candidates
 
-### Testing gotchas
-
-- Native `<input type=date>` can't be filled by browser_type — use planner Schedule modal or DB.
-- Browser tool indices shift on every interaction — re-run `browser_get_state`.
-- The planner tests in `tests/regression.ts` now assert the rolling-window contract.
-
-## User preferences (must-honour)
-
-- Numbered fix lists — **implement in place, do NOT rebuild or duplicate pages**. Preserve structure.
-- **Verify in the browser** before reporting. Clean up test data if you created any.
-- Commit with `Co-authored-by: openhands <openhands@all-hands.dev>`; push to `engineering-app` only when asked.
-- Keep dummy data (the jobs/quotes/inspections above) — they exist to make planner verification possible.
-
-## AGENTS.md
-
-The full automated context lives in `AGENTS.md` at repo root — loaded automatically every conversation. This handover file supplements it with the session-specific state.
+- Local model is "junior assistant" smart; Claude key upgrades quality instantly.
+- No auto-filing rules yet (deliberately — destructive); deterministic rules are the safe next step.
+- Assistant is not streaming — long waits show a spinner, not partial text.
+- Attachments >3MB on send need the Graph upload-session flow (not implemented).
