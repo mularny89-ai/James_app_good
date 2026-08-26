@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import EmailInput from "@/components/EmailInput";
-import EmailAssistant, { type DraftPayload } from "@/components/EmailAssistant";
 
 type Folder = { id: string; name: string; key: string; unread: number; total: number };
 
@@ -268,13 +267,6 @@ export default function OutlookView({ account }: { account: string }) {
     } finally {
       setSending(false);
     }
-  };
-
-  const applyDraft = (d: DraftPayload) => {
-    setAttachments([]);
-    setSelected(null);
-    setCompose({ mode: "new", to: d.to, cc: "", subject: d.subject, body: d.body });
-    flash("Draft loaded into the compose pane.");
   };
 
   const switchFolder = (f: Folder) => {
@@ -554,7 +546,6 @@ export default function OutlookView({ account }: { account: string }) {
           )}
         </div>
       </div>
-      <EmailAssistant onDraft={applyDraft} />
     </div>
   );
 }

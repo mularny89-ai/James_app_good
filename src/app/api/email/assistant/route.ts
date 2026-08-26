@@ -56,13 +56,18 @@ const TOOL_DEFS = [
 
 const SYSTEM = `You are the email assistant inside Mellan Practice Manager, the practice-management app for Mellan Consulting Engineers, a structural engineering consultancy on the Gold Coast, Australia. The user is James Mellan, the director (james@mellanconsulting.com.au).
 
-You can search and read his Outlook mailbox, look up jobs/quotes/invoices in the app, and draft emails into the compose window with draft_email.
+You have tools: search_mailbox (search his Outlook), read_email (full body of one message), get_job_context (jobs/quotes/invoices in the app), draft_email (load a draft into the compose pane).
+
+How to work:
+- ALWAYS use search_mailbox before answering questions about emails — never guess. If the first search finds nothing useful, try again with different terms (sender name, address, job number, subject words).
+- Use read_email on the most relevant results before summarising — previews alone are not enough.
+- For "triage" or "what needs attention" requests: search unread/recent mail, read the important ones, then give a prioritised list with sender, date, and what action is needed.
+- Never invent job details — verify with get_job_context/search_mailbox before quoting numbers, amounts or dates.
 
 Style rules for drafting:
 - Professional but plain-spoken Australian English. Short paragraphs. No fluff, no "I hope this email finds you well".
 - Sign off as "Cheers,\nJames" unless told otherwise.
 - Quotes/inspections context: site inspections are $400 + GST each; Form 15 is issued with drawings at no extra cost; Form 12s after inspections once fees are paid.
-- Never invent job details — use get_job_context/search_mailbox to verify facts (job numbers, amounts, dates) before including them.
 
 When answering questions about mail, cite the sender and date. When you draft, always call draft_email AND reply with a short note.`;
 
@@ -100,7 +105,7 @@ async function runTool(name: string, input: any): Promise<string> {
         from: m.from?.emailAddress?.address,
         to: (m.toRecipients ?? []).map((r: any) => r.emailAddress?.address).join(", "),
         date: m.receivedDateTime,
-        body: text.slice(0, 4000),
+        body: text.slice(0, 8000),
       });
     }
     if (name === "get_job_context") {
@@ -148,6 +153,16 @@ async function runTool(name: string, input: any): Promise<string> {
 
 // ---- Provider: Claude (if key set) or free local Ollama (default) ----
 
+type ToolActivity = { tool: string; summary: string };
+
+function activitySummary(tool: string, input: any): string {
+  if (tool === "search_mailbox") return `Searched mailbox for "${input.query}"`;
+  if (tool === "read_email") return "Read email in full";
+  if (tool === "get_job_context") return `Checked job records for "${input.query}"`;
+  if (tool === "draft_email") return `Drafted email to ${input.to}`;
+  return tool;
+}
+
 async function runAnthropic(key: string, message: string, history: any[]) {
   const anthropic = new Anthropic({ apiKey: key });
   const tools = TOOL_DEFS as unknown as Anthropic.Tool[];
@@ -155,6 +170,7 @@ async function runAnthropic(key: string, message: string, history: any[]) {
 
   let draft: any = null;
   let reply = "";
+  const activity: ToolActivity[] = [];
   for (let round = 0; round < 6; round++) {
     const res = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
@@ -172,6 +188,7 @@ async function runAnthropic(key: string, message: string, history: any[]) {
 
     const results: Anthropic.ToolResultBlockParam[] = [];
     for (const tu of toolUses) {
+      activity.push({ tool: tu.name, summary: activitySummary(tu.name, tu.input) });
       const result = await runTool(tu.name, tu.input);
       if (tu.name === "draft_email") {
         const p = JSON.parse(result);
@@ -181,7 +198,7 @@ async function runAnthropic(key: string, message: string, history: any[]) {
     }
     messages.push({ role: "user", content: results });
   }
-  return { reply: reply || "(no reply)", draft, model: "Claude Sonnet" };
+  return { reply: reply || "(no reply)", draft, model: "Claude Sonnet", activity };
 }
 
 const OLLAMA_TOOLS = TOOL_DEFS.map((t) => ({
@@ -200,6 +217,7 @@ async function runOllama(message: string, history: any[]) {
 
   let draft: any = null;
   let reply = "";
+  const activity: ToolActivity[] = [];
   for (let round = 0; round < 6; round++) {
     const res = await fetch(`${base}/v1/chat/completions`, {
       method: "POST",
@@ -217,6 +235,7 @@ async function runOllama(message: string, history: any[]) {
 
     for (const call of calls) {
       const args = typeof call.function?.arguments === "string" ? JSON.parse(call.function.arguments || "{}") : call.function?.arguments ?? {};
+      activity.push({ tool: call.function?.name, summary: activitySummary(call.function?.name, args) });
       const result = await runTool(call.function?.name, args);
       if (call.function?.name === "draft_email") {
         const p = JSON.parse(result);
@@ -225,7 +244,7 @@ async function runOllama(message: string, history: any[]) {
       messages.push({ role: "tool", tool_call_id: call.id, content: result });
     }
   }
-  return { reply: reply || "(no reply)", draft, model: `${model} (local, free)` };
+  return { reply: reply || "(no reply)", draft, model: `${model} (local, free)`, activity };
 }
 
 // POST /api/email/assistant { message, history: [{role, content}] }

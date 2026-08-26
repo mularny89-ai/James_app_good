@@ -16,13 +16,23 @@ type Loaded = {
   docHref: string | null;
 };
 
-export default function EmailComposer({ jobs, connected }: { jobs: EmailJobOpt[]; connected: boolean }) {
+export default function EmailComposer({
+  jobs,
+  connected,
+  initialDraft,
+}: {
+  jobs: EmailJobOpt[];
+  connected: boolean;
+  initialDraft?: { to: string; subject: string; body: string } | null;
+}) {
   const [jobId, setJobId] = useState("");
   const [docType, setDocType] = useState<"quote" | "invoice">("quote");
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [to, setTo] = useState("");
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [loaded, setLoaded] = useState<Loaded | null>(
+    initialDraft ? { to: initialDraft.to, subject: initialDraft.subject, body: initialDraft.body, jobNumber: "", clientName: "", docNumber: "AI draft", docId: null, docHref: null } : null,
+  );
+  const [to, setTo] = useState(initialDraft?.to ?? "");
+  const [subject, setSubject] = useState(initialDraft?.subject ?? "");
+  const [body, setBody] = useState(initialDraft?.body ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
