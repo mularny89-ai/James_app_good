@@ -19,6 +19,7 @@ export default async function JobsPage({
   const clientFilter = searchParams.client ?? "";
   const priorityFilter = searchParams.priority ?? "";
   const yearFilter = searchParams.year ?? "";
+  const sortOrder = searchParams.sort === "asc" ? "asc" : "desc";
   const awaiting = searchParams.awaiting === "1";
 
   const statuses = await db.jobStatus.findMany({ orderBy: { order: "asc" } });
@@ -51,13 +52,16 @@ export default async function JobsPage({
   const allDates = await db.job.findMany({ where: { archived: false }, select: { createdAt: true } });
   const years = Array.from(new Set(allDates.map((j) => j.createdAt.getFullYear()))).sort((a, b) => b - a);
 
-  // List view groups jobs under year headings, newest year first.
+  // List view groups jobs under year headings; job-number sort applies
+  // within each year and to the year group order itself.
+  const cmpNum = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true });
   const jobsByYear = new Map<number, typeof jobs>();
-  for (const j of [...jobs].sort((a, b) => b.jobNumber.localeCompare(a.jobNumber, undefined, { numeric: true }))) {
+  for (const j of [...jobs].sort((a, b) => (sortOrder === "asc" ? cmpNum(a.jobNumber, b.jobNumber) : cmpNum(b.jobNumber, a.jobNumber)))) {
     const y = j.createdAt.getFullYear();
     if (!jobsByYear.has(y)) jobsByYear.set(y, []);
     jobsByYear.get(y)!.push(j);
   }
+  const yearGroups = Array.from(jobsByYear.entries()).sort((a, b) => (sortOrder === "asc" ? a[0] - b[0] : b[0] - a[0]));
 
   const boardColumns = statuses.filter((s) => s.isBoardColumn).sort((a, b) => a.boardOrder - b.boardOrder);
   const kanbanData = boardColumns.map((col) => ({
@@ -81,7 +85,7 @@ export default async function JobsPage({
 
   const qs = (patch: Record<string, string>) => {
     const p = new URLSearchParams();
-    const merged = { view, status: statusFilter, type: typeFilter, client: clientFilter, priority: priorityFilter, year: yearFilter, ...(awaiting ? { awaiting: "1" } : {}), ...patch };
+    const merged = { view, status: statusFilter, type: typeFilter, client: clientFilter, priority: priorityFilter, year: yearFilter, sort: sortOrder === "asc" ? "asc" : "", ...(awaiting ? { awaiting: "1" } : {}), ...patch };
     Object.entries(merged).forEach(([k, v]) => v && p.set(k, v));
     return `/jobs?${p.toString()}`;
   };
@@ -103,6 +107,7 @@ export default async function JobsPage({
       {/* Filters — Section 68 */}
       <form method="GET" action="/jobs" className="mb-4 flex flex-wrap items-end gap-2">
         <input type="hidden" name="view" value={view} />
+        {sortOrder === "asc" && <input type="hidden" name="sort" value="asc" />}
         <div>
           <label className="label">Status</label>
           <select name="status" defaultValue={statusFilter} className="input w-44">
@@ -158,7 +163,11 @@ export default async function JobsPage({
           <table className="w-full border-collapse">
             <thead className="sticky top-0 bg-gray-50">
               <tr className="border-b border-line">
-                <th className="th">Job №</th>
+                <th className="th">
+                  <Link href={qs({ sort: sortOrder === "asc" ? "" : "asc" })} className="link" title="Sort by job number">
+                    Job № {sortOrder === "asc" ? "▲" : "▼"}
+                  </Link>
+                </th>
                 <th className="th">Project / Address</th>
                 <th className="th">Client</th>
                 <th className="th">Type</th>
@@ -169,7 +178,7 @@ export default async function JobsPage({
               </tr>
             </thead>
             <tbody>
-              {Array.from(jobsByYear.entries()).map(([year, yearJobs]) => (
+              {yearGroups.map(([year, yearJobs]) => (
                 <Fragment key={year}>
                   <tr className="border-b border-line bg-indigo-50/60">
                     <td colSpan={8} className="td py-1.5">

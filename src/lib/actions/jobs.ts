@@ -63,8 +63,9 @@ export async function createJob(fd: FormData) {
   const job = await db.$transaction(async (tx) => {
     const { seq } = await nextNumber(tx, "job");
     const jobNumber = await formatJobNumber(seq);
-    // Name is derived, never typed: J66XXX — address (falls back to the number alone).
-    const name = site.siteAddress ? `${jobNumber} — ${site.siteAddress}` : jobNumber;
+    // Name is derived, never typed: J66XXX — street, suburb (no state/postcode — it's the folder name).
+    const shortAddr = [site.siteStreet, site.siteSuburb].filter(Boolean).join(", ");
+    const name = shortAddr ? `${jobNumber} — ${shortAddr}` : jobNumber;
     const typeName = str(fd, "projectType");
     const type = typeName ? await tx.jobType.findUnique({ where: { name: typeName } }) : null;
     return tx.job.create({

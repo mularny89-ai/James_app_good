@@ -212,10 +212,11 @@ export async function acceptQuoteAndCreateJob(id: number) {
     const siteParts = quote.siteStreet || quote.siteSuburb
       ? { street: quote.siteStreet, suburb: quote.siteSuburb }
       : splitAddress(quote.siteAddress);
+    const shortAddr = [siteParts.street, siteParts.suburb].filter(Boolean).join(", ");
     const job = await tx.job.create({
       data: {
         jobNumber,
-        name: quote.siteAddress ? `${jobNumber} — ${quote.siteAddress}` : jobNumber,
+        name: shortAddr ? `${jobNumber} — ${shortAddr}` : jobNumber,
         clientId: quote.clientId,
         clientContact: quote.contactName,
         siteAddress: quote.siteAddress,
