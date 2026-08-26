@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 // POST /api/email/config { secret, appUrl } — save the Azure app credentials
 // to the database (avoids needing server env vars).
 export async function POST(req: Request) {
-  const { secret, appUrl } = await req.json();
+  const form = await req.formData();
+  const secret = form.get("secret");
   const data: Record<string, string> = {};
   if (typeof secret === "string" && secret.trim()) data.msalClientSecret = secret.trim();
   if (!Object.keys(data).length) {
