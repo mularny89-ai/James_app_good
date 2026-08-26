@@ -39,6 +39,10 @@ model CompanySettings {
   // Quote email template — subject + body with {{mergeFields}} (Settings → Email Template)
   quoteEmailSubject String @default("")
   quoteEmailBody    String @default("")
+  // Microsoft 365 (Outlook) connection — MSAL refresh-token cache, email address + tenant used to connect
+  msalTokenCache  String @default("")
+  msalAccount     String @default("")
+  msalTenantId    String @default("common")
   // Preferences
   dateFormat       String  @default("d MMM yyyy") // Australian
   timeFormat       String  @default("24h")

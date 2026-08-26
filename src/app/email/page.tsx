@@ -1,12 +1,16 @@
 import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui";
 import EmailComposer, { type EmailJobOpt } from "@/components/EmailComposer";
+import InboxPanel from "@/components/InboxPanel";
+import { msalConnection, msalConfigured } from "@/lib/msal";
 
 export const dynamic = "force-dynamic";
 
-export default async function EmailPage() {
-  const settings = await db.companySettings.findUnique({ where: { id: 1 } });
-  const email = settings?.email ?? "";
+export default async function EmailPage({ searchParams }: { searchParams: Record<string, string | undefined> }) {
+  const { connected, account } = await msalConnection();
+  const configured = msalConfigured();
+  const notice = searchParams.error;
+  const justConnected = searchParams.connected;
 
   const jobsRaw = await db.job.findMany({
     where: { archived: false, status: { name: { notIn: ["Completed", "Cancelled"] } } },
@@ -21,41 +25,58 @@ export default async function EmailPage() {
 
   return (
     <div className="p-5">
-      <PageHeader title="Email" subtitle="Outlook integration and document email generator" />
+      <PageHeader title="Email" subtitle="Outlook inbox, sending and document email generator" />
 
-      {/* Outlook integration */}
-      <div className="card mb-4 p-4">
-        <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-ink-muted">Outlook Integration</h2>
-        <p className="mb-3 text-sm text-ink-muted">
-          Direct inbox sync (read and send email from inside the app) requires connecting your Microsoft 365
-          account — say the word and I’ll wire that up. For now, use these shortcuts:
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <a
-            href={`https://outlook.office.com/mail/deeplink/compose?mailtouri=${encodeURIComponent(`mailto:?subject=`)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="btn"
-          >
-            ✉ New Email in Outlook
-          </a>
-          <a href="https://outlook.office.com/mail/" target="_blank" rel="noreferrer" className="btn">
-            Open Outlook Inbox
-          </a>
-          {email && (
-            <a href={`mailto:${email}`} className="btn">
-              Your address: {email}
-            </a>
-          )}
+      {notice && (
+        <div className="mb-4 rounded-md border border-err/30 bg-red-50 px-3 py-2 text-sm text-err">
+          {notice === "msal_not_configured"
+            ? "Microsoft 365 credentials aren't set on this server (MSAL_CLIENT_SECRET missing)."
+            : decodeURIComponent(notice)}
         </div>
-        <p className="mt-3 text-xs text-ink-muted">
-          The generator below fills in To / Subject / Body — use <strong>Open in Mail App</strong> to send it
-          through your default mail client (Outlook if it’s set as default), or copy the fields into an Outlook
-          message.
-        </p>
+      )}
+      {justConnected && (
+        <div className="mb-4 rounded-md border border-ok/30 bg-green-50 px-3 py-2 text-sm text-ok">
+          Connected to Microsoft 365 as {decodeURIComponent(justConnected)} ✓
+        </div>
+      )}
+
+      {/* Microsoft 365 connection */}
+      <div className="card mb-4 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-ink-muted">Microsoft 365 Connection</h2>
+            <p className="text-sm text-ink-muted">
+              {connected ? (
+                <>Connected as <strong>{account}</strong> — inbox and sending are live below.</>
+              ) : configured ? (
+                <>Not connected. Connect once with your Microsoft 365 login and the app can read your inbox and send email for you.</>
+              ) : (
+                <>This server is missing the Microsoft app secret (MSAL_CLIENT_SECRET) — add it to the environment, then connect.</>
+              )}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {connected ? (
+              <>
+                <a href="https://outlook.office.com/mail/" target="_blank" rel="noreferrer" className="btn">
+                  Open Outlook on the Web
+                </a>
+                <form action="/api/email/disconnect" method="POST">
+                  <button className="btn" type="submit">Disconnect</button>
+                </form>
+              </>
+            ) : (
+              <a href="/api/email/connect" className="btn-primary">Connect Microsoft 365</a>
+            )}
+          </div>
+        </div>
       </div>
 
-      <EmailComposer jobs={jobs} />
+      <InboxPanel connected={connected} account={account} />
+
+      <div className="mt-4">
+        <EmailComposer jobs={jobs} connected={connected} />
+      </div>
     </div>
   );
 }

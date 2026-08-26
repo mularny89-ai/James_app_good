@@ -15,7 +15,7 @@ type Loaded = {
   docHref: string | null;
 };
 
-export default function EmailComposer({ jobs }: { jobs: EmailJobOpt[] }) {
+export default function EmailComposer({ jobs, connected }: { jobs: EmailJobOpt[]; connected: boolean }) {
   const [jobId, setJobId] = useState("");
   const [docType, setDocType] = useState<"quote" | "invoice">("quote");
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -25,6 +25,8 @@ export default function EmailComposer({ jobs }: { jobs: EmailJobOpt[] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sentOk, setSentOk] = useState(false);
 
   const generate = async () => {
     if (!jobId) return;
@@ -67,6 +69,27 @@ export default function EmailComposer({ jobs }: { jobs: EmailJobOpt[] }) {
     if (subject) p.set("subject", subject);
     if (body) p.set("body", body);
     return `mailto:?${p.toString()}`;
+  };
+
+  const sendViaOutlook = async () => {
+    if (!to || !subject || !body) return;
+    setSending(true);
+    setError("");
+    try {
+      const res = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject, body, jobId: jobId ? Number(jobId) : undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.error);
+      setSentOk(true);
+      setTimeout(() => setSentOk(false), 5000);
+    } catch (e: any) {
+      setError(e.message || "Send failed.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -127,7 +150,20 @@ export default function EmailComposer({ jobs }: { jobs: EmailJobOpt[] }) {
                 </>
               )}
             </div>
-            <a href={mailtoHref()} className="btn-primary">Open in Mail App</a>
+            <div className="flex items-center gap-2">
+              {sentOk && <span className="text-sm text-ok">Sent ✓</span>}
+              {connected && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={sending || !to || !subject || !body}
+                  onClick={sendViaOutlook}
+                >
+                  {sending ? "Sending…" : "Send via Outlook"}
+                </button>
+              )}
+              <a href={mailtoHref()} className="btn">Open in Mail App</a>
+            </div>
           </div>
 
           <div className="space-y-3">
