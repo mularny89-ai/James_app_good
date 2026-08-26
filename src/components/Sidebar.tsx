@@ -13,6 +13,7 @@ const NAV = [
   { href: "/inspections", label: "Site Inspections", icon: "⌖" },
   { href: "/inspections/route", label: "Route Planner", icon: "⛳" },
   { href: "/finances", label: "Finances", icon: "$", match: ["/finances", "/quotes", "/invoices"] },
+  { href: "/email", label: "Email", icon: "✉" },
   { href: "/clients", label: "Clients", icon: "♟" },
   { href: "/reports", label: "Reports", icon: "▥" },
   { href: "/settings", label: "Settings", icon: "⚙" },
