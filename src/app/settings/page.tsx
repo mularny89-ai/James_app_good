@@ -1,11 +1,12 @@
 import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
-import { saveCompanySettings, saveFinancialSettings, savePreferences } from "@/lib/actions/settings";
+import { saveCompanySettings, saveFinancialSettings, savePreferences, saveQuoteEmailTemplate } from "@/lib/actions/settings";
 import EmployeeManager from "@/components/EmployeeManager";
 import PresetManager from "@/components/PresetManager";
 import NumberingForm from "@/components/NumberingForm";
 import FormDefaultsForm from "@/components/FormDefaultsForm";
 import { getFormDefaults } from "@/lib/forms";
+import { getQuoteEmailTemplate, QUOTE_EMAIL_FIELDS, DEFAULT_QUOTE_EMAIL_SUBJECT, DEFAULT_QUOTE_EMAIL_BODY } from "@/lib/email-template";
 import { PageHeader, Field } from "@/components/ui";
 import BrandingForm from "@/components/BrandingForm";
 import ConfigListEditor from "@/components/ConfigListEditor";
@@ -24,6 +25,7 @@ const TABS = [
   { key: "inspections", label: "Inspection Types" },
   { key: "presets", label: "Invoice Presets" },
   { key: "formdefaults", label: "Form Defaults" },
+  { key: "email", label: "Email Template" },
   { key: "financial", label: "Financial" },
   { key: "preferences", label: "Preferences" },
 ];
@@ -49,6 +51,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Rec
   ]);
 
   const formDefaults = await getFormDefaults();
+  const emailTemplate = await getQuoteEmailTemplate();
 
   return (
     <div className="p-5">
@@ -139,6 +142,32 @@ export default async function SettingsPage({ searchParams }: { searchParams: Rec
             <h3 className="section-title mb-1">Inspection Types</h3>
             <ConfigListEditor kind="inspectionType" items={inspTypes} />
           </div>
+        )}
+
+        {tab === "email" && (
+          <form action={saveQuoteEmailTemplate} className="card space-y-4 p-5">
+            <div>
+              <h3 className="section-title">Quote Email Template</h3>
+              <p className="text-xs text-ink-muted">
+                Used by the ✉ Email button on each quote. Merge fields below are replaced with the quote&apos;s details — copy them into your subject or body.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {QUOTE_EMAIL_FIELDS.map((f) => (
+                <code key={f.key} title={f.label} className="rounded border border-line bg-gray-50 px-1.5 py-0.5 text-xs">{`{{${f.key}}}`}</code>
+              ))}
+            </div>
+            <Field label="Subject">
+              <input name="quoteEmailSubject" className="input" defaultValue={emailTemplate.subject} placeholder={DEFAULT_QUOTE_EMAIL_SUBJECT} />
+            </Field>
+            <Field label="Body">
+              <textarea name="quoteEmailBody" rows={16} className="input font-mono text-sm" defaultValue={emailTemplate.body} placeholder={DEFAULT_QUOTE_EMAIL_BODY} />
+            </Field>
+            <p className="text-xs text-ink-muted">Leave either field empty to restore the built-in default wording.</p>
+            <div className="flex justify-end border-t border-line pt-4">
+              <button type="submit" className="btn-primary">Save Email Template</button>
+            </div>
+          </form>
         )}
 
         {tab === "financial" && (

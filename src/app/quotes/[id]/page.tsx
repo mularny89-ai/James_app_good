@@ -12,6 +12,8 @@ import BrandDocument from "@/components/BrandDocument";
 import ConfirmButton from "@/components/ConfirmButton";
 import PrintButton from "@/components/PrintButton";
 import PrintOptionsPanel from "@/components/PrintOptionsPanel";
+import QuoteEmailPanel from "@/components/QuoteEmailPanel";
+import { getQuoteEmailTemplate, mergeEmailTemplate } from "@/lib/email-template";
 import { quoteStatusColor } from "@/lib/constants";
 import { parsePrintOpts } from "@/lib/print-opts";
 
@@ -39,6 +41,24 @@ export default async function QuoteDetailPage({
   const converted = !!quote.job;
   const editable = mode === "edit" && !converted && quote.status !== "Cancelled";
   const printOpts = parsePrintOpts(searchParams);
+
+  const emailTemplate = await getQuoteEmailTemplate();
+  const emailMerge = {
+    clientName: quote.client.name,
+    contactName: quote.contactName || quote.client.contactPerson,
+    siteAddress: quote.siteAddress,
+    quoteNumber: quote.quoteNumber,
+    total: quote.total,
+    validUntil: quote.validUntil,
+    companyName: settings.companyName,
+  };
+  const emailProps = {
+    defaultTo: quote.client.email,
+    defaultSubject: mergeEmailTemplate(emailTemplate.subject, emailMerge),
+    defaultBody: mergeEmailTemplate(emailTemplate.body, emailMerge),
+    defaultLeadTime: "2 weeks",
+    defaultCompletionTime: "2 weeks",
+  };
 
   async function updateBound(fd: FormData) {
     "use server";
@@ -70,6 +90,7 @@ export default async function QuoteDetailPage({
                 !converted && quote.status !== "Cancelled" && <Link href={`/quotes/${id}?mode=edit`} className="btn">Edit</Link>
               )}
               <PrintButton />
+              <Link href={`/quotes/${id}?email=1`} className="btn">✉ Email</Link>
               <form action={async () => { "use server"; await duplicateQuote(id); }}>
                 <button type="submit" className="btn">Duplicate</button>
               </form>
@@ -102,6 +123,7 @@ export default async function QuoteDetailPage({
             </>
           }
         />
+        {searchParams.email === "1" && <QuoteEmailPanel {...emailProps} />}
       </div>
 
       {editable ? (

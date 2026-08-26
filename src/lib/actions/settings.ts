@@ -80,6 +80,18 @@ export async function saveNumberingSettings(fd: FormData) {
   revalidatePath("/", "layout");
 }
 
+export async function saveQuoteEmailTemplate(fd: FormData) {
+  await db.companySettings.upsert({
+    where: { id: 1 },
+    update: {
+      quoteEmailSubject: str(fd, "quoteEmailSubject"),
+      quoteEmailBody: str(fd, "quoteEmailBody"),
+    },
+    create: { id: 1 },
+  });
+  revalidatePath("/", "layout");
+}
+
 export async function saveFinancialSettings(fd: FormData) {
   await db.companySettings.upsert({
     where: { id: 1 },

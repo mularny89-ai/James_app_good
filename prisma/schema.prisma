@@ -36,6 +36,9 @@ model CompanySettings {
   formDefaults     String  @default("{}")
   // Bank/payment details printed on invoices when "Payment Advice" is on
   paymentAdvice    String  @default("")
+  // Quote email template — subject + body with {{mergeFields}} (Settings → Email Template)
+  quoteEmailSubject String @default("")
+  quoteEmailBody    String @default("")
   // Preferences
   dateFormat       String  @default("d MMM yyyy") // Australian
   timeFormat       String  @default("24h")
