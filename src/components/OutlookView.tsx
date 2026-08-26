@@ -185,7 +185,19 @@ export default function OutlookView({ account }: { account: string }) {
     loadFolders();
   };
 
-  const createTask = async (m: FullMessage) => {
+  const [taskPicker, setTaskPicker] = useState(false);
+  const [taskLists, setTaskLists] = useState<{ id: number; name: string; category: string }[]>([]);
+
+  const openTaskPicker = async () => {
+    if (taskLists.length === 0) {
+      const res = await fetch("/api/email/to-task");
+      if (res.ok) setTaskLists((await res.json()).lists ?? []);
+    }
+    setTaskPicker((p) => !p);
+  };
+
+  const createTask = async (m: FullMessage, listId?: number) => {
+    setTaskPicker(false);
     const res = await fetch("/api/email/to-task", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -196,6 +208,7 @@ export default function OutlookView({ account }: { account: string }) {
         preview: m.preview,
         jobId: m.jobs[0]?.id,
         clientId: m.client?.id,
+        listId,
       }),
     });
     const data = await res.json();
@@ -480,7 +493,25 @@ export default function OutlookView({ account }: { account: string }) {
                     >
                       {selected.isRead ? "✉" : "✉✓"}
                     </button>
-                    <button className="btn px-2 py-1 text-xs" title="Create a follow-up task from this email" onClick={() => createTask(selected)}>✓ Task</button>
+                    <div className="relative">
+                      <button className="btn px-2 py-1 text-xs" title="Create a follow-up task from this email" onClick={openTaskPicker}>✓ Task</button>
+                      {taskPicker && (
+                        <div className="absolute right-0 z-40 mt-1 w-56 overflow-hidden rounded-md border border-line bg-white shadow-lg">
+                          <div className="border-b border-line bg-gray-50 px-2.5 py-1.5 text-xs font-semibold text-ink-muted">Create task in…</div>
+                          {taskLists.map((l) => (
+                            <button
+                              key={l.id}
+                              className="block w-full px-2.5 py-1.5 text-left text-sm hover:bg-gray-100"
+                              onClick={() => createTask(selected, l.id)}
+                            >
+                              {l.name}
+                              <span className="ml-2 text-xs text-ink-muted">{l.category}</span>
+                            </button>
+                          ))}
+                          {taskLists.length === 0 && <div className="px-2.5 py-2 text-xs text-ink-muted">No lists found.</div>}
+                        </div>
+                      )}
+                    </div>
                     <button className="btn px-2 py-1 text-xs text-err" onClick={() => deleteMessage(selected)}>🗑</button>
                   </div>
                 </div>
