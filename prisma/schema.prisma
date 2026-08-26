@@ -42,7 +42,8 @@ model CompanySettings {
   // Microsoft 365 (Outlook) connection — MSAL refresh-token cache, email address + tenant used to connect
   msalTokenCache  String @default("")
   msalAccount     String @default("")
-  msalTenantId    String @default("common")
+  // Single-tenant app registration -> login must hit this tenant, not /common
+  msalTenantId    String @default("3a228346-9ee3-4dbb-a8da-3a06fc8d550d")
   // Azure app client secret — set via the Email page; env MSAL_CLIENT_SECRET takes precedence
   msalClientSecret String @default("")
   // Preferences

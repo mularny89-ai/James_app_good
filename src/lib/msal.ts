@@ -6,6 +6,10 @@ import { db } from "@/lib/db";
 
 export const MSAL_SCOPES = ["Mail.Read", "Mail.Send", "offline_access", "User.Read"];
 
+// mellanconsulting.com.au tenant — the app registration is single-tenant so
+// /common is rejected by Entra.
+const DEFAULT_TENANT = "3a228346-9ee3-4dbb-a8da-3a06fc8d550d";
+
 function clientId(): string {
   return process.env.MSAL_CLIENT_ID || "eedcf15a-9a4b-4325-a2f4-f7fb0dfe3275";
 }
@@ -57,7 +61,7 @@ async function buildClient(): Promise<ConfidentialClientApplication> {
     auth: {
       clientId: clientId(),
       clientSecret: secret,
-      authority: `https://login.microsoftonline.com/${s?.msalTenantId || "common"}`,
+      authority: `https://login.microsoftonline.com/${s?.msalTenantId || DEFAULT_TENANT}`,
     },
     cache: { cachePlugin },
   };
@@ -92,7 +96,7 @@ export async function handleAuthCallback(code: string, reqBase?: string): Promis
   const homeId = result.account.homeAccountId;
   // Tenant the account lives in — subsequent token refreshes should hit it directly.
   const claims = result.idTokenClaims as Record<string, unknown> | undefined;
-  const tenantId = result.account.tenantId || (claims?.tid as string) || "common";
+  const tenantId = result.account.tenantId || (claims?.tid as string) || DEFAULT_TENANT;
   await db.companySettings.update({
     where: { id: 1 },
     data: { msalAccount: result.account.username || homeId, msalTenantId: tenantId },
@@ -132,6 +136,6 @@ export async function graphRequest(
 export async function disconnectMsal(): Promise<void> {
   await db.companySettings.update({
     where: { id: 1 },
-    data: { msalTokenCache: "", msalAccount: "", msalTenantId: "common" },
+    data: { msalTokenCache: "", msalAccount: "", msalTenantId: DEFAULT_TENANT },
   });
 }
