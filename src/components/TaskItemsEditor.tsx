@@ -60,7 +60,6 @@ function AddTaskModal({
   const [billable, setBillable] = useState(true);
   const [optional, setOptional] = useState(false);
   const [tax1, setTax1] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   const pickPreset = (v: string) => {
     setPresetId(v);
@@ -89,23 +88,20 @@ function AddTaskModal({
       setTax1(true);
       return;
     }
-    // Saving (not add-another) collapses the modal to a spinner while the row is added.
-    setSaving(true);
     onSave({ name: finalName, description: description.trim(), qty, unitPrice: billable ? rate : 0, gst: tax1 }, false);
+    onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-6" onClick={saving ? undefined : onClose}>
-      {saving ? (
-        <div className="card flex items-center gap-3 px-6 py-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-          <svg className="h-5 w-5 animate-spin" style={{ color: "var(--brand-primary)" }} viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
-          </svg>
-          <span className="text-sm font-semibold">Saving task…</span>
-        </div>
-      ) : (
-      <div className="card w-full max-w-2xl shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-6">
+      {/* Backdrop clicks never dismiss the modal — only Cancel / ✕ / Save do. */}
+      {/* onKeyDown stops Enter inside a field from submitting the surrounding page form. */}
+      <div
+        className="card w-full max-w-2xl shadow-xl"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "TEXTAREA") e.preventDefault();
+        }}
+      >
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <h3 className="text-base font-bold">Add new task</h3>
           <button type="button" className="btn px-2" onClick={onClose} aria-label="Close">✕</button>
@@ -221,7 +217,6 @@ function AddTaskModal({
           <button type="button" className={GREEN_BTN} onClick={() => save(true)} disabled={!ready}>Save &amp; Add Another</button>
         </div>
       </div>
-      )}
     </div>
   );
 }
@@ -299,13 +294,7 @@ export default function TaskItemsEditor({
 
   const addTask = (row: TaskItemRow) => setRows((rs) => [...rs, row]);
 
-  const onModalSave = (row: TaskItemRow, addAnother: boolean) => {
-    // Wait one frame so the modal can render its collapsed saving state first.
-    requestAnimationFrame(() => {
-      addTask(row);
-      if (!addAnother) setModalOpen(false);
-    });
-  };
+  const onModalSave = (row: TaskItemRow) => addTask(row);
 
   const move = (i: number, dir: -1 | 1) =>
     setRows((rs) => {

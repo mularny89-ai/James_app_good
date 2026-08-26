@@ -18,7 +18,7 @@ export const DEFAULT_QUOTE_EMAIL_SUBJECT = "Quote {{quoteNumber}} — {{siteAddr
 
 export const DEFAULT_QUOTE_EMAIL_BODY = `Hi {{firstName}},
 
-Please find attached a quote for the structural engineering services at '{{siteAddress}}'.
+Please find attached a quote for the structural engineering services at {{siteAddress}}.
 
 The quote includes the full structural design and associated framing, together with a full set of detailed structural drawings.
 
@@ -26,7 +26,7 @@ Site inspections are not included and are charged at $400 + GST per inspection. 
 
 A Form 15 will be issued with the structural drawings at no additional cost. Form 12s will also be issued at no additional cost once the relevant inspections are complete and the inspection fees have been paid.
 
-My current lead time is approximately '{{leadTime}}'. Once I commence the project, I will require around '{{completionTime}}' to complete the engineering and issue the structural drawings.
+My current lead time is approximately {{leadTime}}. Once I commence the project, I will require around {{completionTime}} to complete the engineering and issue the structural drawings.
 
 Please let me know how you would like to proceed.
 Cheers,
